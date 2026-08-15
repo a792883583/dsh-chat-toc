@@ -1,0 +1,38 @@
+# dsh-chat-toc
+
+[中文](README.md) · [Español](README.es.md)
+
+A chat table-of-contents plugin for the DSH Web GUI: a book-style outline bar on the right edge of the conversation; hover to expand the outline, click any entry to jump to that message.
+
+## Features
+
+- **Outline bar**: hugs the right edge of the chat area (left of the Git panel's collapse arrow). Each message is a tick mark — the longer the mark, the more content; user messages are blue, assistant messages green
+- **Current position highlight**: as you scroll, the mark for the current message is highlighted (synced between the bar and the popup list)
+- **Hover to expand**: move the mouse onto the bar to reveal the full outline (role color bar + number + message summary); it collapses automatically when the mouse leaves
+- **Click to jump**: click any entry to smooth-scroll to the corresponding message
+- **Multilingual**: follows the DSH Web UI language (Chinese / English); Spanish browsers automatically get Spanish copy; defaults to Simplified Chinese
+- Light / dark theme follows the DSH Web GUI; coexists with dsh-git-panel, positions follow automatically
+
+## Screenshots
+
+**Outline bar** (tick marks on the right edge of the chat after a few turns; the current message is highlighted):
+
+![Outline bar](docs/toc-bar.png)
+
+**Hover-expanded outline** (role color bar + number + summary, click to jump):
+
+![Outline list](docs/toc-pop.png)
+
+## Installation
+
+```sh
+dsh plugin --profile web add dsh-chat-toc
+```
+
+Restart `dsh web`, and after a few turns of conversation the outline bar appears on the right edge of the chat.
+
+> For local development, install via a link instead: `dsh plugin --profile web add link:/path/to/dsh-chat-toc`. After editing source, run `npm run build` and refresh the page to see changes.
+
+## License
+
+MIT

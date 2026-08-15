@@ -1,0 +1,5 @@
+# dsh-chat-toc — DSH web GUI chat table-of-contents bundle.
+# Registered by `dsh plugin --profile web add link:<path>` (or npm once published).
+- insert:
+    - id: ui-chat-toc
+      name: 'dsh-chat-toc'

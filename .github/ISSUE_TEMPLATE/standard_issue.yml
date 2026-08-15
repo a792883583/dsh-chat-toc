@@ -1,0 +1,91 @@
+name: 功能请求或问题 (Request or question)
+description: 请求新功能、更新文档或提出项目问题。
+title: "[Issue]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请保持本模板完整并填写所有必填部分。删除必填部分的 Issue 将被自动关闭。Bug 请使用「Bug 报告」表单。
+
+        提交前请先搜索确认没有重复：[搜索现有 Issue](https://github.com/a792883583/dsh-chat-toc/issues?q=is%3Aissue)
+  - type: checkboxes
+    id: duplicate-check
+    attributes:
+      label: 提交前查重
+      description: 提交前请先搜索确认没有重复的 Issue。
+      options:
+        - label: 我已搜索过 open/closed 的 Issue，确认本 Issue 没有重复。
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及区域
+      description: 选择问题涉及的插件区域；不确定可选「其他」。
+      options:
+        - 目录窄条
+        - 弹出列表
+        - 跳转定位
+        - 当前阅读高亮
+        - 多语言 (i18n)
+        - 安装 / 构建
+        - 其他 / 不确定
+    validations:
+      required: true
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue 类型
+      description: 选择最接近的分类。
+      options:
+        - 功能请求
+        - 文档
+        - 问题
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 摘要
+      description: 用一两句话描述问题或请求。
+      placeholder: 问题或请求的变更是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: expected-outcome
+    attributes:
+      label: 预期结果
+      description: 描述问题解决后应达成的效果。
+      placeholder: 你期望的结果是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: details-reproduction
+    attributes:
+      label: 详情 / 复现步骤
+      description: 若是 Bug，请给出复现步骤；若是请求，请说明使用场景与约束。
+      placeholder: |
+        1. 打开 ...
+        2. 点击 ...
+        3. 出现 ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: DSH 版本、浏览器、插件名称与版本、操作系统及关键配置。与具体环境无关时填 N/A。
+      placeholder: |
+        - DSH 版本:
+        - 浏览器:
+        - 插件名称 / 版本:
+        - 操作系统:
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 补充信息
+      description: 如有截图、日志、链接或其他上下文，请补充。
+    validations:
+      required: false

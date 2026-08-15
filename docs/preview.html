@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>dsh-chat-toc preview</title>
+<style>
+  body { margin:0; padding:0; background:#ffffff; font-family:-apple-system,BlinkMacSystemFont,
+    "Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; }
+  body[data-view="bar"] #view-bar { display:block; }
+  body[data-view="pop"] #view-pop { display:block; }
+  #view-bar, #view-pop { display:none; }
+
+  /* ===== 模拟聊天区 ===== */
+  .chat { position:relative; width:600px; margin:0 auto; padding:16px 20px; }
+  .msg { display:flex; margin-bottom:14px; }
+  .msg .bubble { max-width:70%; padding:8px 12px; border-radius:10px; font-size:13px;
+    line-height:1.6; color:#24292f; }
+  .msg.user { justify-content:flex-end; }
+  .msg.user .bubble { background:#e8f0fe; border:1px solid rgba(25,118,210,0.25); }
+  .msg.assistant .bubble { background:#f6f8fa; border:1px solid rgba(128,128,128,0.2); }
+
+  /* ===== 目录窄条（与 TocBar.tsx 同款样式） ===== */
+  .toc { --toc-fg:#24292f; --toc-muted:#6e7781; --toc-bg:#ffffff; --toc-border:rgba(128,128,128,0.25);
+    --toc-hover:rgba(0,0,0,0.06); --toc-accent:#1976d2; --toc-user:#1976d2; --toc-assistant:#1a7f37;
+    --toc-other:#8b949e; position:absolute; right:-20px; top:-8px; bottom:-8px; width:14px; }
+  .toc-bar { position:absolute; top:0; bottom:0; width:14px; border-radius:7px;
+    display:flex; justify-content:center; }
+  .toc-dots { position:absolute; top:8px; bottom:8px; left:0; right:0;
+    display:flex; flex-direction:column; align-items:center; gap:4px; overflow:hidden; }
+  .toc-dot { flex:none; height:4px; border-radius:2px; background:var(--toc-other); opacity:0.5; }
+  .toc-dot.user { background:var(--toc-user); }
+  .toc-dot.assistant { background:var(--toc-assistant); }
+  .toc-dot.current { opacity:1; transform:scale(1.15); box-shadow:0 0 0 1px var(--toc-bg); }
+  .toc-dot:first-child { margin-top:auto; }
+  .toc-dot:last-child { margin-bottom:auto; }
+
+  /* ===== 弹出目录列表 ===== */
+  .toc-pop { position:absolute; right:-206px; top:0; width:280px; max-height:70vh; overflow-y:auto;
+    background:var(--toc-bg); border:1px solid var(--toc-border); border-radius:10px;
+    box-shadow:0 12px 32px rgba(0,0,0,0.2); padding:6px; }
+  .toc-pop .head { display:flex; align-items:center; gap:6px; padding:4px 8px 8px;
+    font-size:11px; color:var(--toc-muted); font-weight:600; letter-spacing:0.4px;
+    border-bottom:1px solid var(--toc-border); margin-bottom:6px; }
+  .toc-pop .head svg { opacity:0.7; }
+  .toc-item { display:flex; align-items:flex-start; gap:8px; padding:6px 8px;
+    border-radius:6px; cursor:pointer; font-size:12px; color:var(--toc-fg); }
+  .toc-item:hover, .toc-item.current { background:var(--toc-hover); }
+  .toc-item .bar { flex:none; width:3px; align-self:stretch; border-radius:2px;
+    background:var(--toc-other); opacity:0.7; }
+  .toc-item .bar.user { background:var(--toc-user); }
+  .toc-item .bar.assistant { background:var(--toc-assistant); }
+  .toc-item .num { flex:none; min-width:20px; text-align:right; color:var(--toc-muted);
+    font-size:11px; line-height:1.6; font-variant-numeric:tabular-nums; }
+  .toc-item .text { flex:1; min-width:0; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; line-height:1.6; }
+</style>
+</head>
+<body data-view="bar">
+<script>
+  document.body.dataset.view = new URLSearchParams(location.search).get('v') || 'bar'
+</script>
+
+<div id="view-bar">
+  <div class="chat">
+    <div class="msg user"><div class="bubble">帮我看看这个仓库的提交历史，最近都改了什么？</div></div>
+    <div class="msg assistant"><div class="bubble">最近 5 次提交：<br>1. feat(login): add SSO provider adapter<br>2. fix(ui): align table headers<br>3. refactor(api): extract client factory<br>4. chore: pin node 20 in CI<br>5. feat(auth): session refresh interceptor</div></div>
+    <div class="msg user"><div class="bubble">把第 3 个提交的 diff 发给我</div></div>
+    <div class="msg assistant"><div class="bubble">好的，以下是 refactor(api) 的完整 diff：<br>...（共 14 个文件，+312 −108）</div></div>
+    <div class="msg user"><div class="bubble">这个改动会影响现有接口吗？</div></div>
+    <div class="msg assistant"><div class="bubble">不影响。所有导出符号保持兼容，内部只调整了工厂函数的组装顺序。</div></div>
+    <div class="msg user"><div class="bubble">那测试覆盖率是多少？</div></div>
+    <div class="msg assistant"><div class="bubble">分支覆盖 92%，行覆盖 88%。需要我把完整的覆盖率报告贴出来吗？</div></div>
+    <div class="toc">
+      <div class="toc-bar">
+        <div class="toc-dots">
+          <div class="toc-dot user" style="width:5px"></div>
+          <div class="toc-dot assistant current" style="width:14px"></div>
+          <div class="toc-dot user" style="width:5px"></div>
+          <div class="toc-dot assistant" style="width:11px"></div>
+          <div class="toc-dot user" style="width:6px"></div>
+          <div class="toc-dot assistant" style="width:8px"></div>
+          <div class="toc-dot user" style="width:5px"></div>
+          <div class="toc-dot assistant" style="width:9px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-pop">
+  <div class="chat">
+    <div class="msg user"><div class="bubble">帮我看看这个仓库的提交历史，最近都改了什么？</div></div>
+    <div class="msg assistant"><div class="bubble">最近 5 次提交：<br>1. feat(login): add SSO provider adapter<br>2. fix(ui): align table headers</div></div>
+    <div class="msg user"><div class="bubble">把第 3 个提交的 diff 发给我</div></div>
+    <div class="msg assistant"><div class="bubble">好的，以下是 refactor(api) 的完整 diff：<br>...（共 14 个文件，+312 −108）</div></div>
+    <div class="msg user"><div class="bubble">这个改动会影响现有接口吗？</div></div>
+    <div class="msg assistant"><div class="bubble">不影响。所有导出符号保持兼容。</div></div>
+    <div class="toc">
+      <div class="toc-bar" style="background:rgba(0,0,0,0.06)">
+        <div class="toc-dots">
+          <div class="toc-dot user" style="width:5px"></div>
+          <div class="toc-dot assistant current" style="width:14px"></div>
+          <div class="toc-dot user" style="width:5px"></div>
+          <div class="toc-dot assistant" style="width:11px"></div>
+          <div class="toc-dot user" style="width:6px"></div>
+          <div class="toc-dot assistant" style="width:8px"></div>
+        </div>
+      </div>
+      <div class="toc-pop">
+        <div class="head">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor"
+            strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M2 3.5h12M2 8h9M2 12.5h6" />
+          </svg>
+          对话目录
+        </div>
+        <div class="toc-item">
+          <span class="bar user"></span><span class="num">1</span>
+          <span class="text">帮我看看这个仓库的提交历史，最近都改了什么？</span>
+        </div>
+        <div class="toc-item current">
+          <span class="bar assistant"></span><span class="num">2</span>
+          <span class="text">最近 5 次提交：1. feat(login): add SSO provider adapter…</span>
+        </div>
+        <div class="toc-item">
+          <span class="bar user"></span><span class="num">3</span>
+          <span class="text">把第 3 个提交的 diff 发给我</span>
+        </div>
+        <div class="toc-item">
+          <span class="bar assistant"></span><span class="num">4</span>
+          <span class="text">好的，以下是 refactor(api) 的完整 diff：…</span>
+        </div>
+        <div class="toc-item">
+          <span class="bar user"></span><span class="num">5</span>
+          <span class="text">这个改动会影响现有接口吗？</span>
+        </div>
+        <div class="toc-item">
+          <span class="bar assistant"></span><span class="num">6</span>
+          <span class="text">不影响。所有导出符号保持兼容。…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
