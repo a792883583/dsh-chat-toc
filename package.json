@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-toc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH web GUI chat table-of-contents: a hoverable outline on the right edge of the conversation that jumps to any message.",
   "license": "MIT",
   "author": "Jaden Tang <jaden.tang@sjfood.com>",
@@ -43,9 +43,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
-    "react": "^18.2.0"
+    "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.6 <0.3.0",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.6 <0.3.0",
+    "react": ">=16.8.0 <20.0.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
