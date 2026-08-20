@@ -31,8 +31,8 @@ const ITEM_SELECTOR = '[data-chat-anchor-key]'
 
 /** 摘要文本最长字符数。 */
 const SUMMARY_MAX = 80
-/** 文本兜底刷新间隔（流式输出期间消息文本持续变化）。 */
-const REFRESH_MS = 1000
+/** 文本兜底刷新间隔（流式输出期间消息文本持续变化；低频避免常驻开销）。 */
+const REFRESH_MS = 1500
 
 /** Apply the browser half. */
 export function apply(ctx: TocClientContext): void {
@@ -61,30 +61,36 @@ export function apply(ctx: TocClientContext): void {
     }
 
     /** 全量重采目录项；仅在内容变化时重渲染（React diff 按 key 复用）。 */
+    // 用 rAF 合并连续变更（打开会话时 DOM 批量重建，避免每帧全量提取文本）。
+    let collectRaf = 0
     const collect = (): void => {
-      if (flow === null) return
-      const seen = new Set<string>()
-      const next: TocItem[] = []
-      flow.querySelectorAll<HTMLElement>(ITEM_SELECTOR).forEach((el) => {
-        const key = el.dataset.chatAnchorKey ?? ''
-        if (key === '' || seen.has(key)) return
-        seen.add(key)
-        next.push({
-          key,
-          kind: el.dataset.chatFlowKind ?? '',
-          text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
-          el,
+      if (collectRaf !== 0) return
+      collectRaf = requestAnimationFrame(() => {
+        collectRaf = 0
+        if (flow === null) return
+        const seen = new Set<string>()
+        const next: TocItem[] = []
+        flow.querySelectorAll<HTMLElement>(ITEM_SELECTOR).forEach((el) => {
+          const key = el.dataset.chatAnchorKey ?? ''
+          if (key === '' || seen.has(key)) return
+          seen.add(key)
+          next.push({
+            key,
+            kind: el.dataset.chatFlowKind ?? '',
+            text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
+            el,
+          })
         })
+        const changed =
+          next.length !== items.length ||
+          next.some((item, index) => {
+            const prev = items[index]
+            return prev === undefined || prev.key !== item.key || prev.text !== item.text
+          })
+        if (!changed) return
+        items = next
+        render()
       })
-      const changed =
-        next.length !== items.length ||
-        next.some((item, index) => {
-          const prev = items[index]
-          return prev === undefined || prev.key !== item.key || prev.text !== item.text
-        })
-      if (!changed) return
-      items = next
-      render()
     }
 
     /** 绑定消息流容器（会话切换 / 组件重建后重新绑定）。 */
@@ -100,16 +106,21 @@ export function apply(ctx: TocClientContext): void {
       console.debug('[dsh-chat-toc] attached', { flow, scrollEl })
     }
 
-    // 轮询等待会话 DOM 出现（shell 启动/会话切换时）。
+    // 轮询等待会话 DOM 出现；attach 成功后停止（interval 兜底负责重建检测）。
     let raf = 0
+    let polling = true
     const poll = (): void => {
-      if (disposed) return
+      if (disposed || !polling) return
       attach()
-      raf = requestAnimationFrame(poll)
+      if (flow === null) {
+        raf = requestAnimationFrame(poll)
+      } else {
+        polling = false
+      }
     }
     raf = requestAnimationFrame(poll)
 
-    // 兜底：流式输出文本刷新 + flow 重建检测。
+    // 兜底：流式输出文本刷新 + flow 重建检测（低频，避免常驻开销）。
     interval = window.setInterval(() => {
       if (disposed) return
       if (flow !== null && !flow.isConnected) {
@@ -117,6 +128,8 @@ export function apply(ctx: TocClientContext): void {
         scrollEl = null
         observer?.disconnect()
         observer = null
+        polling = true
+        raf = requestAnimationFrame(poll)
         items = []
         attach()
         render()
@@ -128,6 +141,7 @@ export function apply(ctx: TocClientContext): void {
     return () => {
       disposed = true
       cancelAnimationFrame(raf)
+      if (collectRaf !== 0) cancelAnimationFrame(collectRaf)
       window.clearInterval(interval)
       observer?.disconnect()
       try {
