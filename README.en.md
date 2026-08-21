@@ -9,6 +9,7 @@ A chat table-of-contents plugin for the DSH Web GUI: a book-style outline bar on
 - **Outline bar**: hugs the right edge of the chat area (left of the Git panel's collapse arrow). Each message is a tick mark — the longer the mark, the more content; user messages are blue, assistant messages green
 - **Current position highlight**: as you scroll, the mark for the current message is highlighted (synced between the bar and the popup list)
 - **Hover to expand**: move the mouse onto the bar to reveal the full outline (role color bar + number + message summary); it collapses automatically when the mouse leaves
+- **Outline search**: the expanded outline has a search box that filters messages by summary/key in real time (case-insensitive), making it easy to find and jump to historical messages
 - **Click to jump**: click any entry to smooth-scroll to the corresponding message
 - **Multilingual**: follows the DSH Web UI language (Chinese / English); Spanish browsers automatically get Spanish copy; defaults to Simplified Chinese
 - Light / dark theme follows the DSH Web GUI; coexists with dsh-git-panel, positions follow automatically

@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-toc",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "DSH web GUI chat table-of-contents: a hoverable outline on the right edge of the conversation that jumps to any message.",
   "license": "MIT",
   "author": "Jaden Tang <jaden.tang@sjfood.com>",
