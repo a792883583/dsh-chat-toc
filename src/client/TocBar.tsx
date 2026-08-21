@@ -66,6 +66,11 @@ const STYLE = `
 .dsh-toc-item .text { flex:1; min-width:0; white-space:nowrap; overflow:hidden;
   text-overflow:ellipsis; line-height:1.6; }
 .dsh-toc-empty { padding:10px 8px; font-size:12px; color:var(--toc-muted); }
+.dsh-toc-search { width:100%; padding:5px 8px; margin-bottom:6px; font-size:12px;
+  color:var(--toc-fg); background:var(--toc-bg); border:1px solid var(--toc-border);
+  border-radius:6px; outline:none; }
+.dsh-toc-search:focus { border-color:var(--toc-accent); }
+.dsh-toc-search::placeholder { color:var(--toc-muted); }
 `
 
 let styleInjected = false
@@ -90,6 +95,7 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   const t = useT()
   const [rect, setRect] = useState({ right: 0, top: 0, height: 0 })
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const closeTimer = useRef(0)
 
   // 跟踪定位：目录条停靠在 git 面板折叠箭头的左侧（聊天区内侧）；
@@ -171,6 +177,13 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     }))
   }, [items, rect.height])
 
+  // 搜索过滤：按摘要文本包含匹配（大小写不敏感）。
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (q === '') return items
+    return items.filter((item) => item.text.toLowerCase().includes(q) || item.key.toLowerCase().includes(q))
+  }, [items, query])
+
   ensureStyle()
   if (rect.height === 0) return <div className="dsh-toc" style={{ display: 'none' }} />
 
@@ -201,10 +214,12 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
             </svg>
             {t('toc.title')}
           </div>
-          {items.length === 0 ? (
-            <div className="dsh-toc-empty">{t('toc.empty')}</div>
+          <input className="dsh-toc-search" value={query} placeholder={t('toc.search')}
+            onChange={(event) => setQuery(event.target.value)} />
+          {filtered.length === 0 ? (
+            <div className="dsh-toc-empty">{query.trim() === '' ? t('toc.empty') : t('toc.searchEmpty')}</div>
           ) : (
-            items.map((item, index) => (
+            filtered.map((item, index) => (
               <div key={item.key}
                 className={`dsh-toc-item${item.key === currentKey ? ' current' : ''}`}
                 title={t('toc.jump')} onClick={() => jumpTo(item)}>

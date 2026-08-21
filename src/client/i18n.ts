@@ -14,16 +14,22 @@ const DICTS: Record<Lang, Dict> = {
   zh: {
     'toc.title': '对话目录',
     'toc.empty': '暂无对话消息',
+    'toc.search': '搜索消息…',
+    'toc.searchEmpty': '无匹配消息',
     'toc.jump': '跳转到此消息',
   },
   en: {
     'toc.title': 'Table of contents',
     'toc.empty': 'No messages yet',
+    'toc.search': 'Search messages…',
+    'toc.searchEmpty': 'No matches',
     'toc.jump': 'Jump to this message',
   },
   es: {
     'toc.title': 'Índice de la conversación',
     'toc.empty': 'Aún no hay mensajes',
+    'toc.search': 'Buscar mensajes…',
+    'toc.searchEmpty': 'Sin resultados',
     'toc.jump': 'Ir a este mensaje',
   },
 }
