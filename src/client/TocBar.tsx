@@ -71,6 +71,14 @@ const STYLE = `
   border-radius:6px; outline:none; }
 .dsh-toc-search:focus { border-color:var(--toc-accent); }
 .dsh-toc-search::placeholder { color:var(--toc-muted); }
+.dsh-toc-star-toggle { display:inline-flex; align-items:center; gap:2px; padding:2px 5px; border:none;
+  background:transparent; color:var(--toc-muted); cursor:pointer; font-size:11px; border-radius:5px; }
+.dsh-toc-star-toggle:hover { background:var(--toc-hover); }
+.dsh-toc-star-toggle.active { color:var(--toc-accent); }
+.dsh-toc-star { flex:none; padding:1px; border:none; background:transparent; color:var(--toc-muted);
+  cursor:pointer; border-radius:4px; line-height:0; }
+.dsh-toc-star:hover { background:var(--toc-hover); }
+.dsh-toc-star.on { color:var(--toc-accent); }
 `
 
 let styleInjected = false
@@ -96,7 +104,33 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   const [rect, setRect] = useState({ right: 0, top: 0, height: 0 })
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // 收藏：消息 key 集合（localStorage 持久化）。
+  const [starred, setStarred] = useState<Set<string>>(() => {
+    try {
+      const raw = window.localStorage.getItem('dsh-toc-starred')
+      return raw !== null ? new Set(JSON.parse(raw) as string[]) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+  // 过滤模式：全部 / 仅收藏。
+  const [starOnly, setStarOnly] = useState(false)
   const closeTimer = useRef(0)
+
+  /** 切换某条消息的收藏状态。 */
+  const toggleStar = useCallback((key: string): void => {
+    setStarred((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      try {
+        window.localStorage.setItem('dsh-toc-starred', JSON.stringify([...next]))
+      } catch {
+        /* 忽略 */
+      }
+      return next
+    })
+  }, [])
 
   // 跟踪定位：目录条停靠在 git 面板折叠箭头的左侧（聊天区内侧）；
   // 无箭头时回退到滚动容器右缘外侧。
@@ -177,12 +211,13 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     }))
   }, [items, rect.height])
 
-  // 搜索过滤：按摘要文本包含匹配（大小写不敏感）。
+  // 搜索 + 收藏过滤：先按收藏，再按摘要文本包含匹配（大小写不敏感）。
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (q === '') return items
-    return items.filter((item) => item.text.toLowerCase().includes(q) || item.key.toLowerCase().includes(q))
-  }, [items, query])
+    const base = starOnly ? items.filter((item) => starred.has(item.key)) : items
+    if (q === '') return base
+    return base.filter((item) => item.text.toLowerCase().includes(q) || item.key.toLowerCase().includes(q))
+  }, [items, query, starred, starOnly])
 
   ensureStyle()
   if (rect.height === 0) return <div className="dsh-toc" style={{ display: 'none' }} />
@@ -213,11 +248,22 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
               <path d="M2 3.5h12M2 8h9M2 12.5h6" />
             </svg>
             {t('toc.title')}
+            <span className="spacer" style={{ flex: 1 }} />
+            <button type="button" className={`dsh-toc-star-toggle${starOnly ? ' active' : ''}`}
+              title={t('toc.starOnly')} onClick={() => setStarOnly((v) => !v)}>
+              <svg viewBox="0 0 16 16" width="12" height="12" fill={starOnly ? 'currentColor' : 'none'}
+                stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
+                <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
+              </svg>
+              <span>{starred.size > 0 ? String(starred.size) : ''}</span>
+            </button>
           </div>
           <input className="dsh-toc-search" value={query} placeholder={t('toc.search')}
             onChange={(event) => setQuery(event.target.value)} />
           {filtered.length === 0 ? (
-            <div className="dsh-toc-empty">{query.trim() === '' ? t('toc.empty') : t('toc.searchEmpty')}</div>
+            <div className="dsh-toc-empty">
+              {starOnly ? t('toc.starEmpty') : (query.trim() === '' ? t('toc.empty') : t('toc.searchEmpty'))}
+            </div>
           ) : (
             filtered.map((item, index) => (
               <div key={item.key}
@@ -226,6 +272,19 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
                 <span className={`bar ${DOT_COLOR[item.kind] ?? ''}`} />
                 <span className="num">{index + 1}</span>
                 <span className="text">{item.text || item.key}</span>
+                <button type="button"
+                  className={`dsh-toc-star${starred.has(item.key) ? ' on' : ''}`}
+                  title={starred.has(item.key) ? t('toc.starRemove') : t('toc.starAdd')}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    toggleStar(item.key)
+                  }}>
+                  <svg viewBox="0 0 16 16" width="12" height="12"
+                    fill={starred.has(item.key) ? 'currentColor' : 'none'}
+                    stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
+                  </svg>
+                </button>
               </div>
             ))
           )}
