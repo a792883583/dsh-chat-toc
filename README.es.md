@@ -11,6 +11,7 @@ Un plugin de índice de conversación para la GUI web de DSH: una barra de esque
 - **Expandir al pasar el ratón**: mueve el ratón a la barra para ver el índice completo (barra de color por rol + número + resumen del mensaje); se contrae automáticamente al salir
 - **Búsqueda en el índice**: el índice expandido tiene un buscador que filtra los mensajes por resumen/clave en tiempo real (sin distinción de mayúsculas), ideal para localizar y saltar a mensajes históricos
 - **Marcadores de mensajes**: pase el ratón por cualquier entrada del índice y toque la estrella (⭐) para marcar mensajes clave (p. ej. conclusiones, contratos API); la cabecera del índice tiene un filtro de un clic "solo destacados"; los marcadores persisten en localStorage del navegador
+- **Exportar / Copiar índice Markdown**: la cabecera del índice ofrece un botón "📋 Copiar índice" para extraer el esquema completo de la conversación en un árbol Markdown con un solo clic
 - **Clic para ir al mensaje**: haz clic en cualquier entrada para desplazarte suavemente hasta el mensaje correspondiente
 - **Multilingüe**: sigue el idioma de la interfaz web de DSH (chino / inglés); los navegadores en español reciben automáticamente el texto en español; por defecto chino simplificado
 - Tema claro / oscuro siguiendo la GUI web de DSH; coexiste con dsh-git-panel, las posiciones se ajustan automáticamente

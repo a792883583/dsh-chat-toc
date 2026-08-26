@@ -11,6 +11,7 @@ A chat table-of-contents plugin for the DSH Web GUI: a book-style outline bar on
 - **Hover to expand**: move the mouse onto the bar to reveal the full outline (role color bar + number + message summary); it collapses automatically when the mouse leaves
 - **Outline search**: the expanded outline has a search box that filters messages by summary/key in real time (case-insensitive), making it easy to find and jump to historical messages
 - **Message bookmarks**: hover any outline entry and tap the star (⭐) to bookmark key messages (e.g. conclusions, API contracts); the outline header has a one-click "starred only" filter; bookmarks persist in browser localStorage across reloads
+- **Export / Copy Markdown Outline**: the outline header provides a "📋 Copy outline" button to extract the entire conversation outline into a formatted Markdown tree in one click
 - **Click to jump**: click any entry to smooth-scroll to the corresponding message
 - **Multilingual**: follows the DSH Web UI language (Chinese / English); Spanish browsers automatically get Spanish copy; defaults to Simplified Chinese
 - Light / dark theme follows the DSH Web GUI; coexists with dsh-git-panel, positions follow automatically

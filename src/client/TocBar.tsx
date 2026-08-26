@@ -115,7 +115,25 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   })
   // 过滤模式：全部 / 仅收藏。
   const [starOnly, setStarOnly] = useState(false)
+  const [copied, setCopied] = useState(false)
   const closeTimer = useRef(0)
+
+  /** 导出/复制当前大纲为 Markdown。 */
+  const exportMarkdown = useCallback((): void => {
+    if (items.length === 0) return
+    const lines = items.map((item, idx) => {
+      const role = item.kind === 'user' ? '👤 User' : item.kind === 'assistant' ? '🤖 Assistant' : '💬 Message'
+      const star = starred.has(item.key) ? ' ⭐' : ''
+      return `${idx + 1}. **${role}**${star}: ${item.text || item.key}`
+    })
+    const doc = `# 对话目录大纲\n\n共 ${items.length} 条记录：\n\n${lines.join('\n')}\n`
+    if (navigator?.clipboard?.writeText) {
+      void navigator.clipboard.writeText(doc).then(() => {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 2000)
+      })
+    }
+  }, [items, starred])
 
   /** 切换某条消息的收藏状态。 */
   const toggleStar = useCallback((key: string): void => {
@@ -249,6 +267,14 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
             </svg>
             {t('toc.title')}
             <span className="spacer" style={{ flex: 1 }} />
+            <button type="button" className="dsh-toc-star-toggle"
+              title={t('toc.export')} onClick={exportMarkdown}>
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none"
+                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 2h6a1 1 0 0 1 1 1v1H4V3a1 1 0 0 1 1-1zM4 4h8v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z" />
+              </svg>
+              <span>{copied ? t('toc.exported') : ''}</span>
+            </button>
             <button type="button" className={`dsh-toc-star-toggle${starOnly ? ' active' : ''}`}
               title={t('toc.starOnly')} onClick={() => setStarOnly((v) => !v)}>
               <svg viewBox="0 0 16 16" width="12" height="12" fill={starOnly ? 'currentColor' : 'none'}
