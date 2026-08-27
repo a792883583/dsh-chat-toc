@@ -17,6 +17,8 @@ export interface TocItem {
   text: string
   /** 消息 DOM 元素（点击时滚动目标）。 */
   el: HTMLElement
+  /** 消息特征标签（code / tool / error）。 */
+  tag?: 'code' | 'tool' | 'error'
 }
 
 const STYLE = `
@@ -63,6 +65,11 @@ const STYLE = `
 .dsh-toc-item .bar.assistant { background:var(--toc-assistant); }
 .dsh-toc-item .num { flex:none; min-width:20px; text-align:right; color:var(--toc-muted);
   font-size:11px; line-height:1.6; font-variant-numeric:tabular-nums; }
+.dsh-toc-badge { flex:none; font-size:9.5px; font-weight:600; padding:1px 4px; border-radius:4px;
+  line-height:1.4; text-transform:uppercase; }
+.dsh-toc-badge.code { background:rgba(88,166,255,0.15); color:var(--toc-accent); }
+.dsh-toc-badge.tool { background:rgba(210,153,34,0.15); color:#d29922; }
+.dsh-toc-badge.error { background:rgba(248,81,73,0.15); color:#f85149; }
 .dsh-toc-item .text { flex:1; min-width:0; white-space:nowrap; overflow:hidden;
   text-overflow:ellipsis; line-height:1.6; }
 .dsh-toc-empty { padding:10px 8px; font-size:12px; color:var(--toc-muted); }
@@ -297,6 +304,7 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
                 title={t('toc.jump')} onClick={() => jumpTo(item)}>
                 <span className={`bar ${DOT_COLOR[item.kind] ?? ''}`} />
                 <span className="num">{index + 1}</span>
+                {item.tag ? <span className={`dsh-toc-badge ${item.tag}`}>{item.tag}</span> : null}
                 <span className="text">{item.text || item.key}</span>
                 <button type="button"
                   className={`dsh-toc-star${starred.has(item.key) ? ' on' : ''}`}

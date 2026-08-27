@@ -74,11 +74,21 @@ export function apply(ctx: TocClientContext): void {
           const key = el.dataset.chatAnchorKey ?? ''
           if (key === '' || seen.has(key)) return
           seen.add(key)
+          // 探测消息特征（是否含代码块 / 工具调用 / 错误）
+          let tag: TocItem['tag']
+          if (el.querySelector('pre, code, [class*=code], [class*=Code]')) {
+            tag = 'code'
+          } else if (el.querySelector('[data-tool-call], [class*=tool], [class*=Tool]')) {
+            tag = 'tool'
+          } else if (el.querySelector('[class*=error], [class*=Error], [class*=danger], [class*=Danger]')) {
+            tag = 'error'
+          }
           next.push({
             key,
             kind: el.dataset.chatFlowKind ?? '',
             text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
             el,
+            tag,
           })
         })
         const changed =
