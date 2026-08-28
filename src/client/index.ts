@@ -76,12 +76,20 @@ export function apply(ctx: TocClientContext): void {
           seen.add(key)
           // 探测消息特征（是否含代码块 / 工具调用 / 错误）
           let tag: TocItem['tag']
-          if (el.querySelector('pre, code, [class*=code], [class*=Code]')) {
+          let preview: string | undefined
+          const codeEl = el.querySelector<HTMLElement>('pre, code, [class*=code], [class*=Code]')
+          const toolEl = el.querySelector<HTMLElement>('[data-tool-call], [class*=tool], [class*=Tool]')
+          const errEl = el.querySelector<HTMLElement>('[class*=error], [class*=Error], [class*=danger], [class*=Danger]')
+
+          if (codeEl) {
             tag = 'code'
-          } else if (el.querySelector('[data-tool-call], [class*=tool], [class*=Tool]')) {
+            preview = (codeEl.textContent ?? '').slice(0, 100).trim()
+          } else if (toolEl) {
             tag = 'tool'
-          } else if (el.querySelector('[class*=error], [class*=Error], [class*=danger], [class*=Danger]')) {
+            preview = (toolEl.textContent ?? '').slice(0, 80).trim()
+          } else if (errEl) {
             tag = 'error'
+            preview = (errEl.textContent ?? '').slice(0, 80).trim()
           }
           next.push({
             key,
@@ -89,6 +97,7 @@ export function apply(ctx: TocClientContext): void {
             text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
             el,
             tag,
+            preview,
           })
         })
         const changed =

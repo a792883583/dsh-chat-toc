@@ -19,6 +19,8 @@ export interface TocItem {
   el: HTMLElement
   /** 消息特征标签（code / tool / error）。 */
   tag?: 'code' | 'tool' | 'error'
+  /** 提取的代码或工具预览内容。 */
+  preview?: string
 }
 
 const STYLE = `
@@ -48,30 +50,34 @@ const STYLE = `
 .dsh-toc-dot:last-child { margin-bottom:auto; }
 
 /* 悬停展开的目录列表 */
-.dsh-toc-pop { position:absolute; right:calc(100% + 10px); top:-10px; width:280px;
-  max-height:70vh; overflow-y:auto; background:var(--toc-bg); border:1px solid var(--toc-border);
+.dsh-toc-pop { position:absolute; right:calc(100% + 10px); top:-10px; width:290px;
+  max-height:72vh; overflow-y:auto; background:var(--toc-bg); border:1px solid var(--toc-border);
   border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,0.2); padding:6px; }
 .dsh-toc-pop .head { display:flex; align-items:center; gap:6px; padding:4px 8px 8px;
   font-size:11px; color:var(--toc-muted); font-weight:600; letter-spacing:0.4px;
   border-bottom:1px solid var(--toc-border); margin-bottom:6px; }
 .dsh-toc-pop .head svg { opacity:0.7; }
-.dsh-toc-item { display:flex; align-items:flex-start; gap:8px; padding:6px 8px;
+.dsh-toc-item { display:flex; flex-direction:column; gap:3px; padding:5px 8px;
   border-radius:6px; cursor:pointer; font-size:12px; color:var(--toc-fg); }
 .dsh-toc-item:hover { background:var(--toc-hover); }
 .dsh-toc-item.current { background:var(--toc-hover); }
-.dsh-toc-item .bar { flex:none; width:3px; align-self:stretch; border-radius:2px;
+.dsh-toc-item-row { display:flex; align-items:center; gap:6px; }
+.dsh-toc-item .bar { flex:none; width:3px; height:14px; border-radius:2px;
   background:var(--toc-other); opacity:0.7; }
 .dsh-toc-item .bar.user { background:var(--toc-user); }
 .dsh-toc-item .bar.assistant { background:var(--toc-assistant); }
-.dsh-toc-item .num { flex:none; min-width:20px; text-align:right; color:var(--toc-muted);
-  font-size:11px; line-height:1.6; font-variant-numeric:tabular-nums; }
-.dsh-toc-badge { flex:none; font-size:9.5px; font-weight:600; padding:1px 4px; border-radius:4px;
-  line-height:1.4; text-transform:uppercase; }
+.dsh-toc-item .num { flex:none; min-width:18px; text-align:right; color:var(--toc-muted);
+  font-size:11px; font-variant-numeric:tabular-nums; }
+.dsh-toc-badge { flex:none; font-size:9px; font-weight:600; padding:1px 4px; border-radius:4px;
+  line-height:1.2; text-transform:uppercase; }
 .dsh-toc-badge.code { background:rgba(88,166,255,0.15); color:var(--toc-accent); }
 .dsh-toc-badge.tool { background:rgba(210,153,34,0.15); color:#d29922; }
 .dsh-toc-badge.error { background:rgba(248,81,73,0.15); color:#f85149; }
 .dsh-toc-item .text { flex:1; min-width:0; white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis; line-height:1.6; }
+  text-overflow:ellipsis; line-height:1.4; font-size:11.5px; }
+.dsh-toc-preview-box { font-size:10.5px; opacity:0.75; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:rgba(128,128,128,0.06); padding:4px 6px; border-radius:4px; margin-left:24px;
+  white-space:pre-wrap; word-break:break-all; max-height:48px; overflow:hidden; }
 .dsh-toc-empty { padding:10px 8px; font-size:12px; color:var(--toc-muted); }
 .dsh-toc-search { width:100%; padding:5px 8px; margin-bottom:6px; font-size:12px;
   color:var(--toc-fg); background:var(--toc-bg); border:1px solid var(--toc-border);
@@ -302,23 +308,26 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
               <div key={item.key}
                 className={`dsh-toc-item${item.key === currentKey ? ' current' : ''}`}
                 title={t('toc.jump')} onClick={() => jumpTo(item)}>
-                <span className={`bar ${DOT_COLOR[item.kind] ?? ''}`} />
-                <span className="num">{index + 1}</span>
-                {item.tag ? <span className={`dsh-toc-badge ${item.tag}`}>{item.tag}</span> : null}
-                <span className="text">{item.text || item.key}</span>
-                <button type="button"
-                  className={`dsh-toc-star${starred.has(item.key) ? ' on' : ''}`}
-                  title={starred.has(item.key) ? t('toc.starRemove') : t('toc.starAdd')}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleStar(item.key)
-                  }}>
-                  <svg viewBox="0 0 16 16" width="12" height="12"
-                    fill={starred.has(item.key) ? 'currentColor' : 'none'}
-                    stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
-                  </svg>
-                </button>
+                <div className="dsh-toc-item-row">
+                  <span className={`bar ${DOT_COLOR[item.kind] ?? ''}`} />
+                  <span className="num">{index + 1}</span>
+                  {item.tag ? <span className={`dsh-toc-badge ${item.tag}`}>{item.tag}</span> : null}
+                  <span className="text">{item.text || item.key}</span>
+                  <button type="button"
+                    className={`dsh-toc-star${starred.has(item.key) ? ' on' : ''}`}
+                    title={starred.has(item.key) ? t('toc.starRemove') : t('toc.starAdd')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleStar(item.key)
+                    }}>
+                    <svg viewBox="0 0 16 16" width="12" height="12"
+                      fill={starred.has(item.key) ? 'currentColor' : 'none'}
+                      stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
+                    </svg>
+                  </button>
+                </div>
+                {item.preview ? <div className="dsh-toc-preview-box">{item.preview}</div> : null}
               </div>
             ))
           )}
