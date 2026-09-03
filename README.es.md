@@ -7,8 +7,10 @@ Un plugin de índice de conversación para la GUI web de DSH: una barra de esque
 ## Características
 
 - **Barra de índice**: pegada al borde derecho del área de chat (a la izquierda de la flecha de colapso del panel de Git). Cada mensaje es una marca — cuanto más larga la marca, más contenido; los mensajes de usuario son azules, los del asistente verdes
+- **Extracción inteligente de encabezados y resúmenes**: prioriza encabezados Markdown (`##`) y conclusiones clave en negrita como resúmenes del índice, organizando mejor las conversaciones técnicas largas
 - **Resaltado de posición actual**: al desplazarte, la marca del mensaje actual se resalta (sincronizado entre la barra y la lista desplegable)
-- **Expandir al pasar el ratón**: mueve el ratón a la barra para ver el índice completo (barra de color por rol + número + resumen del mensaje); se contrae automáticamente al salir
+- **Expandir al pasar el ratón y Fijar panel (Pin)**: mueve el ratón a la barra para ver el índice completo; haz clic en el icono 📌 de la cabecera para **fijar el panel de índice abierto** mientras navegas; haz clic de nuevo o usa el atajo para desfijar
+- **Atajo de teclado global**: pulsa `Cmd/Ctrl + Shift + O` en cualquier momento para alternar o fijar/desfijar el panel de índice
 - **Búsqueda en el índice**: el índice expandido tiene un buscador que filtra los mensajes por resumen/clave en tiempo real (sin distinción de mayúsculas), ideal para localizar y saltar a mensajes históricos
 - **Marcadores de mensajes**: pase el ratón por cualquier entrada del índice y toque la estrella (⭐) para marcar mensajes clave (p. ej. conclusiones, contratos API); la cabecera del índice tiene un filtro de un clic "solo destacados"; los marcadores persisten en localStorage del navegador
 - **Exportar / Copiar índice Markdown**: la cabecera del índice ofrece un botón "📋 Copiar índice" para extraer el esquema completo de la conversación en un árbol Markdown con un solo clic

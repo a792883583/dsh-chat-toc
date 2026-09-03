@@ -7,8 +7,10 @@ A chat table-of-contents plugin for the DSH Web GUI: a book-style outline bar on
 ## Features
 
 - **Outline bar**: hugs the right edge of the chat area (left of the Git panel's collapse arrow). Each message is a tick mark — the longer the mark, the more content; user messages are blue, assistant messages green
+- **Smart heading & summary extraction**: prioritizes Markdown headings (`##`) and key takeaway bold points as outline entries, keeping long technical threads and multi-step tasks organized without clutter
 - **Current position highlight**: as you scroll, the mark for the current message is highlighted (synced between the bar and the popup list)
-- **Hover to expand**: move the mouse onto the bar to reveal the full outline (role color bar + number + message summary); it collapses automatically when the mouse leaves
+- **Hover to expand & Pin open**: move the mouse onto the bar to reveal the full outline; click the 📌 icon in the header to **pin the outline panel open** so it stays visible while browsing; click again or use the shortcut to unpin
+- **Global keyboard shortcut**: press `Cmd/Ctrl + Shift + O` anytime to toggle or pin/unpin the table-of-contents overlay
 - **Outline search**: the expanded outline has a search box that filters messages by summary/key in real time (case-insensitive), making it easy to find and jump to historical messages
 - **Message bookmarks**: hover any outline entry and tap the star (⭐) to bookmark key messages (e.g. conclusions, API contracts); the outline header has a one-click "starred only" filter; bookmarks persist in browser localStorage across reloads
 - **Export / Copy Markdown Outline**: the outline header provides a "📋 Copy outline" button to extract the entire conversation outline into a formatted Markdown tree in one click

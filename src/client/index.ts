@@ -74,12 +74,13 @@ export function apply(ctx: TocClientContext): void {
           const key = el.dataset.chatAnchorKey ?? ''
           if (key === '' || seen.has(key)) return
           seen.add(key)
-          // 探测消息特征（是否含代码块 / 工具调用 / 错误）
+          // 探测消息特征与结构化标题（优先提取 Markdown 标题与加粗结论，避免冗余噪音）
           let tag: TocItem['tag']
           let preview: string | undefined
           const codeEl = el.querySelector<HTMLElement>('pre, code, [class*=code], [class*=Code]')
           const toolEl = el.querySelector<HTMLElement>('[data-tool-call], [class*=tool], [class*=Tool]')
           const errEl = el.querySelector<HTMLElement>('[class*=error], [class*=Error], [class*=danger], [class*=Danger]')
+          const headingEl = el.querySelector<HTMLElement>('h1, h2, h3, h4, strong')
 
           if (codeEl) {
             tag = 'code'
@@ -91,10 +92,19 @@ export function apply(ctx: TocClientContext): void {
             tag = 'error'
             preview = (errEl.textContent ?? '').slice(0, 80).trim()
           }
+
+          let summary = ''
+          if (headingEl && headingEl.textContent && headingEl.textContent.trim().length > 2) {
+            summary = headingEl.textContent.replace(/\s+/g, ' ').trim()
+          }
+          if (!summary) {
+            summary = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+          }
+
           next.push({
             key,
             kind: el.dataset.chatFlowKind ?? '',
-            text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX),
+            text: summary.slice(0, SUMMARY_MAX),
             el,
             tag,
             preview,

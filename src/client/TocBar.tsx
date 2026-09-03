@@ -128,8 +128,22 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   })
   // 过滤模式：全部 / 仅收藏。
   const [starOnly, setStarOnly] = useState(false)
+  const [pinned, setPinned] = useState(false)
   const [copied, setCopied] = useState(false)
   const closeTimer = useRef(0)
+
+  // 全局快捷键 Cmd/Ctrl + Shift + O 开关/固定目录面板
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
+        e.preventDefault()
+        setOpen((prev) => !prev)
+        setPinned((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   /** 导出/复制当前大纲为 Markdown。 */
   const exportMarkdown = useCallback((): void => {
@@ -190,16 +204,17 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     setOpen(true)
   }, [])
   const closeSoon = useCallback((): void => {
+    if (pinned) return
     window.clearTimeout(closeTimer.current)
     closeTimer.current = window.setTimeout(() => setOpen(false), 220)
-  }, [])
+  }, [pinned])
 
   useEffect(() => () => window.clearTimeout(closeTimer.current), [])
 
   const jumpTo = useCallback((item: TocItem): void => {
-    setOpen(false)
+    if (!pinned) setOpen(false)
     item.el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
+  }, [pinned])
 
   // 当前阅读位置：视口顶部之下第一条消息即当前项（滚动时同步高亮）。
   const [currentKey, setCurrentKey] = useState<string | null>(null)
@@ -278,8 +293,16 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
               strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M2 3.5h12M2 8h9M2 12.5h6" />
             </svg>
-            {t('toc.title')}
+            <span title={t('toc.shortcut')}>{t('toc.title')}</span>
             <span className="spacer" style={{ flex: 1 }} />
+            <button type="button" className={`dsh-toc-star-toggle${pinned ? ' active' : ''}`}
+              title={pinned ? t('toc.unpin') : `${t('toc.pin')} (${t('toc.shortcut')})`}
+              onClick={() => setPinned((p) => !p)}>
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor"
+                strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 2h8l-1 6 3 2v1H9v4l-1 1-1-1v-4H2v-1l3-2z" />
+              </svg>
+            </button>
             <button type="button" className="dsh-toc-star-toggle"
               title={t('toc.export')} onClick={exportMarkdown}>
               <svg viewBox="0 0 16 16" width="12" height="12" fill="none"

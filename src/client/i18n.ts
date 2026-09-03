@@ -23,6 +23,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.exported': '已复制',
     'toc.searchEmpty': '无匹配消息',
     'toc.jump': '跳转到此消息',
+    'toc.pin': '固定展开',
+    'toc.unpin': '解除固定',
+    'toc.shortcut': '快捷键：Cmd/Ctrl + Shift + O',
   },
   en: {
     'toc.title': 'Table of contents',
@@ -36,6 +39,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.exported': 'Copied',
     'toc.searchEmpty': 'No matches',
     'toc.jump': 'Jump to this message',
+    'toc.pin': 'Pin open',
+    'toc.unpin': 'Unpin',
+    'toc.shortcut': 'Shortcut: Cmd/Ctrl + Shift + O',
   },
   es: {
     'toc.title': 'Índice de la conversación',
@@ -49,6 +55,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.exported': 'Copiado',
     'toc.searchEmpty': 'Sin resultados',
     'toc.jump': 'Ir a este mensaje',
+    'toc.pin': 'Fijar panel',
+    'toc.unpin': 'Desfijar panel',
+    'toc.shortcut': 'Atajo: Cmd/Ctrl + Shift + O',
   },
 }
 
