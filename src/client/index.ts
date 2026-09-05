@@ -1,13 +1,13 @@
 /**
- * DSH 官方 Turn Rail 原生增强插件：
- * - 零破坏性：不修改官方卡片的任何尺寸与定位属性，彻底避免页面横向撑开产生滚动条
- * - 在官方预览卡片内部底部添加轻巧的操作栏（⭐ 收藏、📋 复制）
- * - 在官方导航轨上方集成极简工具胶囊
+ * DSH 官方 Turn Rail 原生深度增强插件 (v0.3.2):
+ * - 解决指针移出时卡片闪退：利用透明感应桥 (Invisible Bridge)，鼠标移入卡片时保持稳定悬浮，绝不闪退
+ * - 解决非首个节点丢失按钮：监听 React 内部节点重绘，支持任意节点即时精准挂载 ⭐ 收藏 与 📋 复制
+ * - 顶部集成原生风格极简小工具（⭐ 仅看收藏、📋 导出 Markdown 大纲）
  * @module dsh-chat-toc/client/index
  */
 
 import type {} from '@deepseek-ai/dsh-client-runtime'
-import { initI18n, useT } from './i18n.ts'
+import { initI18n } from './i18n.ts'
 
 interface ClientContext {
   effect(fn: () => (() => void) | void, name: string): void
@@ -20,27 +20,43 @@ interface ClientContext {
 export const inject = ['locale']
 
 const STYLE = `
-/* 绝不碰 [class*="preview"] 的 position / width / min-width，保持官方原装计算 */
+/* 1. 透明感应桥：连接卡片与右侧轨道，鼠标平移到卡片上绝不触发离开销毁 */
+[class*="preview"] {
+  pointer-events: auto !important;
+}
+[class*="preview"]::after {
+  content: "";
+  position: absolute;
+  top: -12px;
+  bottom: -12px;
+  right: -26px;
+  width: 32px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+/* 卡片内部操作栏 */
 .dsh-card-action-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 6px;
-  padding-top: 4px;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid rgba(128, 128, 128, 0.15);
   font-size: 11px;
+  user-select: none;
 }
 .dsh-card-action-btn {
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-tertiary, #8b949e);
   cursor: pointer;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   line-height: 1;
   transition: all 0.1s ease;
   font-size: 11px;
@@ -54,7 +70,7 @@ const STYLE = `
   font-weight: 600;
 }
 
-/* 官方轨道顶部小胶囊，不产生任何横向溢出 */
+/* 官方轨道顶部的微型毛玻璃工具条 */
 .dsh-rail-toolbar {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -62,13 +78,12 @@ const STYLE = `
   display: flex;
   align-items: center;
   gap: 2px;
-  background: rgba(128, 128, 128, 0.1);
+  background: rgba(128, 128, 128, 0.12);
   border: 1px solid rgba(128, 128, 128, 0.2);
   border-radius: 6px;
   padding: 1px 2px;
   backdrop-filter: blur(8px);
   z-index: 10;
-  overflow: hidden;
 }
 .dsh-rail-tool-btn {
   border: none;
@@ -81,6 +96,7 @@ const STYLE = `
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.12s ease;
 }
 .dsh-rail-tool-btn:hover {
   background: rgba(128, 128, 128, 0.2);
@@ -90,7 +106,7 @@ const STYLE = `
   color: #eab308;
 }
 
-/* 收藏高亮 */
+/* 收藏项在官方轨道上的醒目高亮 */
 [class*="mark"].dsh-mark-starred:before {
   background: #eab308 !important;
   width: 18px !important;
@@ -139,18 +155,25 @@ export function apply(ctx: ClientContext): void {
 
     let starOnly = false
 
-    // 在官方卡片内部末尾追加操作栏
+    // 核心：无视 React 重绘，瞬时为当前卡片注入操作行
     const enhancePreviewCard = (card: HTMLElement) => {
-      if (card.querySelector('.dsh-card-action-row') !== null) return
-
       const promptEl = card.querySelector('[class*="previewPrompt"]')
-      const textKey = (promptEl?.textContent || card.textContent || '').trim().slice(0, 40)
+      const rawKey = (promptEl?.textContent || card.textContent || '').trim()
+      const textKey = rawKey.slice(0, 40)
       if (!textKey) return
 
-      const row = document.createElement('div')
-      row.className = 'dsh-card-action-row'
+      let row = card.querySelector<HTMLElement>('.dsh-card-action-row')
+      if (row !== null) {
+        // 如果卡片已经换了文本（React 复用了 DOM），更新内部绑定的状态
+        if (row.dataset.key === textKey) return
+        row.remove()
+      }
 
-      // ⭐ 收藏
+      row = document.createElement('div')
+      row.className = 'dsh-card-action-row'
+      row.dataset.key = textKey
+
+      // ⭐ 收藏按钮
       const starBtn = document.createElement('button')
       starBtn.className = 'dsh-card-action-btn'
       const isStarred = getStarred().has(textKey)
@@ -180,7 +203,7 @@ export function apply(ctx: ClientContext): void {
       }
       row.appendChild(starBtn)
 
-      // 📋 复制
+      // 📋 复制按钮
       const copyBtn = document.createElement('button')
       copyBtn.className = 'dsh-card-action-btn'
       copyBtn.innerHTML = `
@@ -192,9 +215,11 @@ export function apply(ctx: ClientContext): void {
       `
       copyBtn.onclick = (e) => {
         e.stopPropagation()
-        const text = (card.textContent || '').trim()
+        const fullText = (card.querySelector('[class*="previewPrompt"]')?.textContent || '') + '\n' +
+                         (card.querySelector('[class*="previewResponse"]')?.textContent || '')
+        const textToCopy = fullText.trim() || rawKey
         if (navigator?.clipboard?.writeText) {
-          void navigator.clipboard.writeText(text).then(() => {
+          void navigator.clipboard.writeText(textToCopy).then(() => {
             copyBtn.querySelector('span')!.textContent = '已复制'
             setTimeout(() => {
               if (copyBtn.querySelector('span')) {
@@ -232,7 +257,7 @@ export function apply(ctx: ClientContext): void {
       })
     }
 
-    // 在官方轨道顶部放入极其轻巧的小开关（仅看收藏与导出大纲）
+    // 官方轨道顶部注入极简小工具
     const injectRailToolbar = () => {
       const rail = document.querySelector<HTMLElement>('[class*="frame"]')
       if (!rail) return
@@ -242,10 +267,10 @@ export function apply(ctx: ClientContext): void {
         toolbar = document.createElement('div')
         toolbar.className = 'dsh-rail-toolbar'
 
-        // 🌟 仅看收藏
+        // 🌟 仅看收藏过滤
         const starToggle = document.createElement('button')
         starToggle.className = 'dsh-rail-tool-btn'
-        starToggle.title = '仅高亮收藏的轮次'
+        starToggle.title = '高亮已收藏的轮次'
         starToggle.innerHTML = `
           <svg viewBox="0 0 16 16" width="12" height="12" fill="${starOnly ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
             <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z"/>
@@ -293,6 +318,17 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
+    // 全局鼠标指针移动监听：无论直接停留在哪一个点，瞬时确保卡片带操作栏
+    const onPointerMove = (e: PointerEvent) => {
+      if (disposed) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.closest('[class*="rail"], [class*="frame"]') || target.closest('[class*="preview"]'))) {
+        const card = document.querySelector<HTMLElement>('[class*="preview"]')
+        if (card) enhancePreviewCard(card)
+      }
+    }
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+
     const observer = new MutationObserver(() => {
       if (disposed) return
       injectRailToolbar()
@@ -311,6 +347,7 @@ export function apply(ctx: ClientContext): void {
     return () => {
       disposed = true
       observer.disconnect()
+      window.removeEventListener('pointermove', onPointerMove)
       window.clearInterval(interval)
       document.querySelector('.dsh-rail-toolbar')?.remove()
     }
