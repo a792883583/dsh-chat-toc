@@ -1,31 +1,43 @@
-# dsh-chat-toc
+# dsh-chat-toc (Navegación y Mejora de Turn Rail Nativo para DSH)
 
-[中文](README.md) · [English](README.en.md)
+[中文说明](./README.md) · [English Documentation](./README.en.md)
 
-Un plugin de mejora del índice de conversación para la GUI web de DSH: se integra profundamente y potencia el Turn Rail nativo oficial sin pistas duplicadas; proporciona atajos globales, búsqueda, marcadores y exportación a Markdown.
+Un plugin de navegación y mejora de índice para la GUI web de DSH: **potencia profundamente el Turn Rail nativo oficial** sin añadir pistas redundantes. Proporciona tarjetas emergentes con vista previa dual (pregunta del usuario + respuesta de IA), marcadores con resaltado dorado brillante, almacenamiento persistente por sesión y una barra de herramientas plana y minimalista (Búsqueda / Filtro de destacados / Exportación a Markdown).
 
 ## Características
 
-- **Fusión Nativa y Cero Redundancia**: Mejora perfectamente el Turn Rail nativo de DSH sin generar una segunda pista redundante, manteniendo la interfaz 100% limpia y elegante.
-- **Atajo de Teclado Global**: Pulsa `Cmd/Ctrl + Shift + O` en cualquier momento para alternar o fijar/desfijar el panel de índice, o haz clic en el botón sutil de esquema en la parte superior del riel.
-- **Extracción Inteligente de Encabezados**: Prioriza encabezados Markdown (`##`) y conclusiones clave en negrita como resúmenes del índice, organizando mejor las conversaciones técnicas largas.
-- **Fijar Panel Abierto (Pin)**: Haz clic en el botón de fijar en la cabecera para bloquear el esquema abierto a la derecha mientras revisas código o conversación.
-- **Búsqueda y Salto Rápido**: Buscador en tiempo real en la parte superior para filtrar mensajes por palabra clave y desplazarse suavemente al mensaje al instante.
-- **Marcadores de Mensajes (⭐)**: Marca conclusiones, planes y contratos clave para acceso rápido; incluye filtro "solo destacados".
-- **Exportar / Copiar Índice Markdown**: Botón de un clic para exportar toda la jerarquía de la conversación como Markdown estructurado.
-- **Sincronización Automática de Sesión**: Completamente sincronizado con la navegación de sesiones de DSH; se limpia de inmediato en conversaciones nuevas.
-- **Multilingüe**: Sincronización automática con el idioma de DSH Web GUI (chino / inglés / español).
-- Tema claro / oscuro siguiendo la GUI web de DSH.
+- **Fusión 100% Nativa y Cero Redundancia**:
+  - Elimina pistas paralelas secundarias para mantener el espacio visual limpio y ordenado.
+  - Se acopla directamente al Turn Rail nativo de DSH, convirtiéndolo en una herramienta de navegación avanzada.
 
-## Capturas de pantalla
+- **Tarjetas Emergentes Estables (Sin Cierres Inesperados)**:
+  - **Vista Previa de Contenido Dual**: Al pasar el ratón por cualquier marca del riel, se muestra una tarjeta que incluye tanto la **👤 Pregunta del usuario** como la **🤖 Respuesta de IA**.
+  - **Puente de Retención de 300 ms**: Mantiene la tarjeta abierta de manera estable mientras mueve el cursor hacia ella, permitiendo seleccionar texto o pulsar botones con total comodidad.
+  - **Acciones Integradas (⭐ Destacar y 📋 Copiar)**: Cada tarjeta integra botones para marcar la conversación o copiar el contenido completo.
 
-**Barra de índice** (marcas en el borde derecho del chat tras varias interacciones; el mensaje actual se resalta):
+- **Almacenamiento Persistente por Sesión**:
+  - Aislado por **ID de Sesión + clave única del mensaje (`chatAnchorKey`)**.
+  - Conserva los destacados tras recargar la página o reiniciar el navegador; solo se eliminan si se borra o archiva la sesión.
 
-![Barra de índice](docs/toc-bar.png)
+- **Cápsula de Herramientas Plana y Elegante**:
+  - Ubicada en la zona superior del riel; **sombras eliminadas por completo** para integrarse de forma plana y limpia con la interfaz.
+  - **🔍 Búsqueda Rápida**: Despliega un cuadro de búsqueda hacia la izquierda; las coincidencias brillan en azul en el riel y se desplazan automáticamente a la posición; pulse `Esc` para cerrarlo.
+  - **⭐ Filtro de Destacados**: Atenúa las marcas no destacadas al 8%, mientras que las destacadas brillan como **líneas doradas de 22px con efecto resplandeciente**.
+  - **📋 Exportar Esquema Markdown**: Copia en un clic toda la estructura de la conversación en formato Markdown.
 
-**Índice desplegado al pasar el ratón** (barra de color por rol + número + resumen, clic para ir al mensaje):
+- **Multilingüe y Adaptable a Temas**:
+  - Sincronización automática con el idioma de DSH Web (español, inglés y chino).
+  - Totalmente compatible con los temas Claro y Oscuro de DSH.
 
-![Índice](docs/toc-pop.png)
+## Capturas de Pantalla
+
+**1. Tarjeta Emergente (Pregunta + Respuesta de IA con acciones de Destacar/Copiar, y Cápsula Superior):**
+
+![Vista previa de tarjeta emergente](docs/toc-pop.png)
+
+**2. Filtro de Destacados Activo (Marcas destacadas brillan en dorado y el resto se atenúa):**
+
+![Resaltado de marcas](docs/toc-bar.png)
 
 ## Instalación
 
@@ -33,13 +45,7 @@ Un plugin de mejora del índice de conversación para la GUI web de DSH: se inte
 dsh plugin --profile web add dsh-chat-toc
 ```
 
-Reinicia `dsh web` y, tras varias interacciones de la conversación, la barra de índice aparece en el borde derecho del chat.
-
-> Para desarrollo local, instala mediante un enlace: `dsh plugin --profile web add link:/path/to/dsh-chat-toc`. Tras editar el código, ejecuta `npm run build` y actualiza la página para ver los cambios.
-
-## Comentarios
-
-¿Encontró un error o tiene una sugerencia? Abra un issue en [GitHub Issues](https://github.com/a792883583/dsh-chat-toc/issues) — sus comentarios nos ayudan a mejorar el plugin.
+Tras actualizar, recarga la pestaña de `dsh web` en tu navegador.
 
 ## Licencia
 

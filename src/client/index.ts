@@ -1,8 +1,11 @@
 /**
- * DSH 官方 Turn Rail 原生深度增强插件 (v0.3.2):
- * - 解决指针移出时卡片闪退：利用透明感应桥 (Invisible Bridge)，鼠标移入卡片时保持稳定悬浮，绝不闪退
- * - 解决非首个节点丢失按钮：监听 React 内部节点重绘，支持任意节点即时精准挂载 ⭐ 收藏 与 📋 复制
- * - 顶部集成原生风格极简小工具（⭐ 仅看收藏、📋 导出 Markdown 大纲）
+ * DSH 官方 Turn Rail 原生深度增强插件:
+ * - 智能提取用户提问 + AI 核心回答：向后遍历本轮正文，完美呈现「提问 + 回复预览」，绝不丢失 AI 回答
+ * - 永久持久化：基于稳定会话 ID (Session ID) + 消息稳定标识 (chatAnchorKey)
+ * - 顶部极简原生小工具条：无生硬外阴影，纯粹扁平，微透呼吸感
+ * - 过滤模式高亮：点击顶部 ⭐ 按钮时，收藏项强制亮金黄色 (100% 绝对不透明发光)，未收藏线条深度淡化
+ * - 顶部胶囊工具条：🔍 搜索、⭐ 收藏过滤、📋 导出 Markdown 大纲
+ * - 自主悬停卡片：300ms 防抖，鼠标移入稳稳停住，可从容点击操作
  * @module dsh-chat-toc/client/index
  */
 
@@ -20,32 +23,82 @@ interface ClientContext {
 export const inject = ['locale']
 
 const STYLE = `
-/* 1. 透明感应桥：连接卡片与右侧轨道，鼠标平移到卡片上绝不触发离开销毁 */
-[class*="preview"] {
-  pointer-events: auto !important;
-}
-[class*="preview"]::after {
-  content: "";
-  position: absolute;
-  top: -12px;
-  bottom: -12px;
-  right: -26px;
-  width: 32px;
-  background: transparent;
-  pointer-events: auto;
+/* 1. 隐藏官方原生脆弱卡片 */
+[class*="_preview"] {
+  display: none !important;
 }
 
-/* 卡片内部操作栏 */
+/* 2. 精美自主悬停卡片 */
+.dsh-enhanced-preview-card {
+  position: fixed;
+  z-index: 1000;
+  width: 300px;
+  background: var(--dsw-alias-surface-overlay, #ffffff);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(128, 128, 128, 0.22));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 10px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--dsw-alias-label-primary, #24292f);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: auto;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform: translateY(-50%);
+  animation: dshPreviewIn 0.12s ease-out;
+}
+@keyframes dshPreviewIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(4px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+[data-ds-dark-theme] .dsh-enhanced-preview-card,
+[data-theme="dark"] .dsh-enhanced-preview-card,
+html.dark .dsh-enhanced-preview-card {
+  background: #1f2937;
+  color: #f3f4f6;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dsh-enhanced-preview-prompt {
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--dsw-alias-label-primary, currentColor);
+  margin-bottom: 5px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+.dsh-enhanced-preview-response {
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-secondary, #6e7781);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+[data-ds-dark-theme] .dsh-enhanced-preview-response,
+[data-theme="dark"] .dsh-enhanced-preview-response,
+html.dark .dsh-enhanced-preview-response {
+  color: #9ca3af;
+}
+
+/* 卡片底部操作栏 */
 .dsh-card-action-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid rgba(128, 128, 128, 0.15);
   font-size: 11px;
-  user-select: none;
 }
 .dsh-card-action-btn {
   border: none;
@@ -70,49 +123,107 @@ const STYLE = `
   font-weight: 600;
 }
 
-/* 官方轨道顶部的微型毛玻璃工具条 */
-.dsh-rail-toolbar {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
+/* 3. 顶部固定胶囊工具条：彻底移除多余生硬阴影，扁平极简原生风 */
+.dsh-top-capsule {
+  position: fixed;
+  z-index: 998;
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: rgba(128, 128, 128, 0.12);
+  background: transparent;
   border: 1px solid rgba(128, 128, 128, 0.2);
-  border-radius: 6px;
-  padding: 1px 2px;
-  backdrop-filter: blur(8px);
-  z-index: 10;
+  border-radius: 8px;
+  box-shadow: none !important;
+  padding: 2px 3px;
+  transition: all 0.15s ease;
+  pointer-events: auto;
 }
-.dsh-rail-tool-btn {
+.dsh-top-capsule:hover {
+  background: var(--dsw-alias-surface-overlay, rgba(255, 255, 255, 0.85));
+  border-color: rgba(128, 128, 128, 0.35);
+}
+[data-ds-dark-theme] .dsh-top-capsule:hover,
+[data-theme="dark"] .dsh-top-capsule:hover,
+html.dark .dsh-top-capsule:hover {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.dsh-top-btn {
   border: none;
   background: transparent;
-  color: var(--dsw-alias-label-tertiary, #8b949e);
+  color: var(--dsw-alias-label-secondary, #6e7781);
   cursor: pointer;
-  padding: 3px;
-  border-radius: 4px;
-  line-height: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 0;
   transition: all 0.12s ease;
 }
-.dsh-rail-tool-btn:hover {
-  background: rgba(128, 128, 128, 0.2);
-  color: currentColor;
+.dsh-top-btn:hover {
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--dsw-alias-label-primary, #24292f);
 }
-.dsh-rail-tool-btn.active {
+[data-ds-dark-theme] .dsh-top-btn:hover,
+[data-theme="dark"] .dsh-top-btn:hover,
+html.dark .dsh-top-btn:hover {
+  color: #f3f4f6;
+}
+.dsh-top-btn.active {
   color: #eab308;
+  background: rgba(234, 179, 8, 0.18);
 }
 
-/* 收藏项在官方轨道上的醒目高亮 */
-[class*="mark"].dsh-mark-starred:before {
-  background: #eab308 !important;
-  width: 18px !important;
+/* 展开的搜索输入条 */
+.dsh-top-search-input {
+  width: 0;
+  opacity: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: width 0.22s ease, opacity 0.15s ease, margin 0.2s ease;
+  margin: 0;
+  padding: 0;
 }
+.dsh-top-search-input.expanded {
+  width: 130px;
+  opacity: 1;
+  margin: 0 4px 0 6px;
+  padding: 2px 4px;
+}
+
+/* 搜索匹配节点：加长发光 */
+.dsh-mark-matched:before,
+.dsh-mark-matched [class*="mark"]:before,
+[class*="markPosition"].dsh-mark-matched [class*="mark"]:before {
+  background: #2563eb !important;
+  box-shadow: 0 0 8px #2563eb !important;
+  width: 22px !important;
+  opacity: 1 !important;
+}
+
+/* 已收藏的 mark 黄金高亮 */
+.dsh-mark-starred:before,
+.dsh-mark-starred [class*="mark"]:before,
+[class*="mark"].dsh-mark-starred:before,
+[class*="markPosition"].dsh-mark-starred [class*="mark"]:before,
+.dsh-filter-starred .dsh-mark-starred:before,
+.dsh-filter-starred .dsh-mark-starred [class*="mark"]:before,
+.dsh-filter-starred [class*="markPosition"].dsh-mark-starred [class*="mark"]:before {
+  background: #eab308 !important;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.95) !important;
+  width: 22px !important;
+  opacity: 1 !important;
+}
+
+/* 过滤模式下，未收藏线条淡化 */
+.dsh-filter-starred [class*="markPosition"]:not(.dsh-mark-starred) [class*="mark"]:before,
 .dsh-filter-starred [class*="mark"]:not(.dsh-mark-starred):before {
-  opacity: 0.15 !important;
+  opacity: 0.08 !important;
 }
 `
 
@@ -138,45 +249,93 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     let disposed = false
 
-    const getStarred = (): Set<string> => {
+    const getSessionId = (): string => {
+      const match = window.location.pathname.match(/\/session\/([^\/]+)/) ||
+                    window.location.hash.match(/session\/([^\/]+)/) ||
+                    window.location.href.match(/session-([a-zA-Z0-9_-]+)/)
+      return match ? match[1] : 'default-session'
+    }
+
+    const getStarredKeys = (): Set<string> => {
       try {
-        const raw = window.localStorage.getItem('dsh-toc-starred')
-        return raw !== null ? new Set(JSON.parse(raw)) : new Set()
+        const sid = getSessionId()
+        const raw = window.localStorage.getItem('dsh_bookmarks_v1')
+        if (raw !== null) {
+          const map = JSON.parse(raw) as Record<string, string[]>
+          if (Array.isArray(map[sid])) {
+            return new Set(map[sid])
+          }
+        }
+        const legacy = window.localStorage.getItem('dsh-toc-starred')
+        return legacy !== null ? new Set(JSON.parse(legacy)) : new Set()
       } catch {
         return new Set()
       }
     }
 
-    const setStarred = (set: Set<string>): void => {
+    const setStarredKeys = (keys: Set<string>): void => {
       try {
-        window.localStorage.setItem('dsh-toc-starred', JSON.stringify([...set]))
+        const sid = getSessionId()
+        let map: Record<string, string[]> = {}
+        const raw = window.localStorage.getItem('dsh_bookmarks_v1')
+        if (raw !== null) {
+          map = JSON.parse(raw)
+        }
+        map[sid] = [...keys]
+        window.localStorage.setItem('dsh_bookmarks_v1', JSON.stringify(map))
+        window.localStorage.setItem('dsh-toc-starred', JSON.stringify([...keys]))
       } catch {}
     }
 
     let starOnly = false
+    let searchExpanded = false
+    let searchQuery = ''
+    let currentCard: HTMLElement | null = null
+    let hideTimer = 0
 
-    // 核心：无视 React 重绘，瞬时为当前卡片注入操作行
-    const enhancePreviewCard = (card: HTMLElement) => {
-      const promptEl = card.querySelector('[class*="previewPrompt"]')
-      const rawKey = (promptEl?.textContent || card.textContent || '').trim()
-      const textKey = rawKey.slice(0, 40)
-      if (!textKey) return
+    // 显示卡片
+    const showCard = (turnIndex: number, anchorKey: string, promptText: string, responseText: string, targetY: number, rightDist: number) => {
+      window.clearTimeout(hideTimer)
+      const stableKey = anchorKey || promptText.trim().slice(0, 40)
 
-      let row = card.querySelector<HTMLElement>('.dsh-card-action-row')
-      if (row !== null) {
-        // 如果卡片已经换了文本（React 复用了 DOM），更新内部绑定的状态
-        if (row.dataset.key === textKey) return
-        row.remove()
+      if (currentCard && currentCard.dataset.key === stableKey) {
+        currentCard.style.top = `${targetY}px`
+        currentCard.style.right = `${rightDist}px`
+        return
       }
 
-      row = document.createElement('div')
+      currentCard?.remove()
+
+      const card = document.createElement('div')
+      card.className = 'dsh-enhanced-preview-card'
+      card.dataset.key = stableKey
+      card.style.top = `${targetY}px`
+      card.style.right = `${rightDist}px`
+
+      card.onmouseenter = () => window.clearTimeout(hideTimer)
+      card.onmouseleave = () => scheduleHide()
+
+      // 👤 用户提问
+      const promptEl = document.createElement('div')
+      promptEl.className = 'dsh-enhanced-preview-prompt'
+      promptEl.textContent = promptText || `第 ${turnIndex + 1} 轮对话`
+      card.appendChild(promptEl)
+
+      // 🤖 AI 核心回复
+      if (responseText) {
+        const respEl = document.createElement('div')
+        respEl.className = 'dsh-enhanced-preview-response'
+        respEl.textContent = responseText
+        card.appendChild(respEl)
+      }
+
+      const row = document.createElement('div')
       row.className = 'dsh-card-action-row'
-      row.dataset.key = textKey
 
       // ⭐ 收藏按钮
       const starBtn = document.createElement('button')
       starBtn.className = 'dsh-card-action-btn'
-      const isStarred = getStarred().has(textKey)
+      const isStarred = getStarredKeys().has(stableKey)
       if (isStarred) starBtn.classList.add('starred')
       starBtn.innerHTML = `
         <svg viewBox="0 0 16 16" width="12" height="12" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
@@ -186,19 +345,19 @@ export function apply(ctx: ClientContext): void {
       `
       starBtn.onclick = (e) => {
         e.stopPropagation()
-        const set = getStarred()
-        if (set.has(textKey)) {
-          set.delete(textKey)
+        const set = getStarredKeys()
+        if (set.has(stableKey)) {
+          set.delete(stableKey)
           starBtn.classList.remove('starred')
           starBtn.querySelector('span')!.textContent = '收藏'
           starBtn.querySelector('svg')?.setAttribute('fill', 'none')
         } else {
-          set.add(textKey)
+          set.add(stableKey)
           starBtn.classList.add('starred')
           starBtn.querySelector('span')!.textContent = '已收藏'
           starBtn.querySelector('svg')?.setAttribute('fill', 'currentColor')
         }
-        setStarred(set)
+        setStarredKeys(set)
         updateRailMarks()
       }
       row.appendChild(starBtn)
@@ -215,16 +374,12 @@ export function apply(ctx: ClientContext): void {
       `
       copyBtn.onclick = (e) => {
         e.stopPropagation()
-        const fullText = (card.querySelector('[class*="previewPrompt"]')?.textContent || '') + '\n' +
-                         (card.querySelector('[class*="previewResponse"]')?.textContent || '')
-        const textToCopy = fullText.trim() || rawKey
+        const fullText = (promptText + '\n' + responseText).trim()
         if (navigator?.clipboard?.writeText) {
-          void navigator.clipboard.writeText(textToCopy).then(() => {
+          void navigator.clipboard.writeText(fullText).then(() => {
             copyBtn.querySelector('span')!.textContent = '已复制'
             setTimeout(() => {
-              if (copyBtn.querySelector('span')) {
-                copyBtn.querySelector('span')!.textContent = '复制'
-              }
+              if (copyBtn.querySelector('span')) copyBtn.querySelector('span')!.textContent = '复制'
             }, 1500)
           })
         }
@@ -232,10 +387,20 @@ export function apply(ctx: ClientContext): void {
       row.appendChild(copyBtn)
 
       card.appendChild(row)
+      document.body.appendChild(card)
+      currentCard = card
+    }
+
+    const scheduleHide = () => {
+      window.clearTimeout(hideTimer)
+      hideTimer = window.setTimeout(() => {
+        currentCard?.remove()
+        currentCard = null
+      }, 300)
     }
 
     const updateRailMarks = () => {
-      const rail = document.querySelector<HTMLElement>('[class*="frame"]')
+      const rail = document.querySelector<HTMLElement>('[class*="frame"], [class*="_frame"]')
       if (!rail) return
 
       if (starOnly) {
@@ -244,51 +409,209 @@ export function apply(ctx: ClientContext): void {
         rail.classList.remove('dsh-filter-starred')
       }
 
-      const starred = getStarred()
-      const marks = rail.querySelectorAll<HTMLElement>('[class*="mark"]')
-      marks.forEach((mark) => {
-        const title = mark.getAttribute('title') || mark.getAttribute('aria-label') || ''
-        const isStar = [...starred].some((s) => title.includes(s))
+      const starred = getStarredKeys()
+      const markItems = Array.from(rail.querySelectorAll<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]'))
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
+
+      const promptRows = rows.filter((r) => r.dataset.chatFlowKind === 'user' || r.querySelector('[class*="UserStyleBubble"]'))
+      const candidates = promptRows.length > 0 ? promptRows : rows
+
+      markItems.forEach((markEl, i) => {
+        let isStar = false
+        let isMatch = false
+
+        if (i < candidates.length) {
+          const row = candidates[i]
+          const anchorKey = row.dataset.chatAnchorKey || ''
+          const text = (row.textContent || '').replace(/\s+/g, ' ').trim()
+          const textKey = text.slice(0, 40)
+
+          if ((anchorKey && starred.has(anchorKey)) || (textKey && starred.has(textKey))) {
+            isStar = true
+          }
+          if (searchQuery && text.toLowerCase().includes(searchQuery)) {
+            isMatch = true
+          }
+        }
+
+        const innerMark = markEl.querySelector<HTMLElement>('[class*="mark"], [class*="_mark"]') || markEl
+
         if (isStar) {
-          mark.classList.add('dsh-mark-starred')
+          markEl.classList.add('dsh-mark-starred')
+          innerMark.classList.add('dsh-mark-starred')
         } else {
-          mark.classList.remove('dsh-mark-starred')
+          markEl.classList.remove('dsh-mark-starred')
+          innerMark.classList.remove('dsh-mark-starred')
+        }
+
+        if (isMatch) {
+          markEl.classList.add('dsh-mark-matched')
+          innerMark.classList.add('dsh-mark-matched')
+        } else {
+          markEl.classList.remove('dsh-mark-matched')
+          innerMark.classList.remove('dsh-mark-matched')
         }
       })
     }
 
-    // 官方轨道顶部注入极简小工具
-    const injectRailToolbar = () => {
-      const rail = document.querySelector<HTMLElement>('[class*="frame"]')
-      if (!rail) return
+    // 提取提问与后续真正 AI 核心回答的高精度算法
+    const extractTurnContent = (activeIdx: number, centerY: number): { key: string; promptText: string; responseText: string } => {
+      const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
+      const promptRows = allRows.filter((r) => r.dataset.chatFlowKind === 'user' || r.querySelector('[class*="UserStyleBubble"]'))
+      const candidates = promptRows.length > 0 ? promptRows : allRows
 
-      let toolbar = rail.querySelector<HTMLElement>('.dsh-rail-toolbar')
-      if (toolbar === null) {
-        toolbar = document.createElement('div')
-        toolbar.className = 'dsh-rail-toolbar'
+      if (candidates.length === 0) return { key: '', promptText: '', responseText: '' }
 
-        // 🌟 仅看收藏过滤
-        const starToggle = document.createElement('button')
-        starToggle.className = 'dsh-rail-tool-btn'
-        starToggle.title = '高亮已收藏的轮次'
-        starToggle.innerHTML = `
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="${starOnly ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+      const idx = activeIdx >= 0 && activeIdx < candidates.length ? activeIdx : Math.floor((centerY / window.innerHeight) * candidates.length)
+      const safeIdx = Math.max(0, Math.min(candidates.length - 1, idx))
+      const userRow = candidates[safeIdx]
+      const key = userRow.dataset.chatAnchorKey || String(safeIdx)
+      const promptText = (userRow.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
+
+      let responseText = ''
+      const startIndex = allRows.indexOf(userRow)
+      if (startIndex >= 0) {
+        // 向后逐一扫描，越过中间的 tool/process，找到真正包含正文文本的 assistant 回复
+        for (let j = startIndex + 1; j < allRows.length; j++) {
+          const nextRow = allRows[j]
+          // 如果遇到了下一个用户提问，停止扫描
+          if (nextRow.dataset.chatFlowKind === 'user' || nextRow.querySelector('[class*="UserStyleBubble"]')) {
+            break
+          }
+          // 优先抓取 markdown 正文段落或纯文本
+          const contentEl = nextRow.querySelector<HTMLElement>('[class*="markdown"], [class*="Markdown"], [class*="messageContent"], [class*="bubble"]') || nextRow
+          const rawText = (contentEl.textContent || '').replace(/\s+/g, ' ').trim()
+          
+          // 过滤掉纯英文小标签或极短状态词
+          if (rawText && rawText.length > 15 && !rawText.startsWith('pwsh -Command') && !rawText.startsWith('read ')) {
+            responseText = rawText.slice(0, 160)
+            break
+          } else if (!responseText && rawText && rawText.length > 5) {
+            responseText = rawText.slice(0, 140)
+          }
+        }
+      }
+
+      return { key, promptText, responseText }
+    }
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (disposed) return
+      const target = e.target as HTMLElement | null
+      if (!target) return
+
+      if (target.closest('.dsh-enhanced-preview-card') || target.closest('.dsh-top-capsule')) {
+        window.clearTimeout(hideTimer)
+        return
+      }
+
+      const markPos = target.closest<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]')
+      const mark = target.closest<HTMLElement>('[class*="mark"], [class*="_mark"]')
+      const rail = target.closest<HTMLElement>('[class*="frame"], [class*="_frame"]')
+
+      if ((markPos || mark) && rail) {
+        const rect = (markPos || mark || rail).getBoundingClientRect()
+        const centerY = rect.top + rect.height / 2
+        const rightDist = window.innerWidth - rail.getBoundingClientRect().left + 12
+
+        const markElements = Array.from(rail.querySelectorAll<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]'))
+        const activeIdx = markPos ? markElements.indexOf(markPos) : markElements.indexOf(mark!.closest('[class*="markPosition"]') || mark!)
+
+        const { key, promptText, responseText } = extractTurnContent(activeIdx, centerY)
+        showCard(activeIdx >= 0 ? activeIdx : 0, key, promptText, responseText, centerY, rightDist)
+      } else {
+        scheduleHide()
+      }
+    }
+    window.addEventListener('mousemove', onMouseMove, { passive: true })
+
+    // 4. 顶部无生硬阴影的扁平化工具条
+    const renderTopCapsule = () => {
+      const rail = document.querySelector<HTMLElement>('[class*="frame"], [class*="_frame"]')
+      if (!rail) {
+        document.querySelector('.dsh-top-capsule')?.remove()
+        return
+      }
+
+      let capsule = document.querySelector<HTMLElement>('.dsh-top-capsule')
+      if (capsule === null) {
+        capsule = document.createElement('div')
+        capsule.className = 'dsh-top-capsule'
+
+        // 🔍 搜索
+        const searchBtn = document.createElement('button')
+        searchBtn.className = 'dsh-top-btn'
+        searchBtn.title = '搜索对话轮次'
+        searchBtn.innerHTML = `
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="7" r="4.5"/>
+            <path d="M10.5 10.5L14 14"/>
+          </svg>
+        `
+
+        const searchInput = document.createElement('input')
+        searchInput.className = 'dsh-top-search-input'
+        searchInput.placeholder = '搜索本页...'
+        searchInput.onkeydown = (e) => {
+          if (e.key === 'Escape') {
+            searchExpanded = false
+            searchInput.classList.remove('expanded')
+            searchBtn.classList.remove('active')
+            searchQuery = ''
+            updateRailMarks()
+          }
+        }
+        searchInput.oninput = () => {
+          searchQuery = searchInput.value.trim().toLowerCase()
+          updateRailMarks()
+          if (searchQuery) {
+            const rows = document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
+            for (const r of rows) {
+              if ((r.textContent || '').toLowerCase().includes(searchQuery)) {
+                r.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                break
+              }
+            }
+          }
+        }
+
+        searchBtn.onclick = (e) => {
+          e.stopPropagation()
+          searchExpanded = !searchExpanded
+          searchInput.classList.toggle('expanded', searchExpanded)
+          searchBtn.classList.toggle('active', searchExpanded)
+          if (searchExpanded) {
+            searchInput.focus()
+          } else {
+            searchQuery = ''
+            updateRailMarks()
+          }
+        }
+        capsule.appendChild(searchBtn)
+        capsule.appendChild(searchInput)
+
+        // ⭐ 收藏过滤
+        const starBtn = document.createElement('button')
+        starBtn.className = 'dsh-top-btn'
+        starBtn.title = '仅高亮已收藏轮次'
+        starBtn.innerHTML = `
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="${starOnly ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
             <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z"/>
           </svg>
         `
-        starToggle.onclick = (e) => {
+        starBtn.onclick = (e) => {
           e.stopPropagation()
           starOnly = !starOnly
-          starToggle.classList.toggle('active', starOnly)
-          starToggle.querySelector('svg')?.setAttribute('fill', starOnly ? 'currentColor' : 'none')
+          starBtn.classList.toggle('active', starOnly)
+          starBtn.querySelector('svg')?.setAttribute('fill', starOnly ? 'currentColor' : 'none')
           updateRailMarks()
         }
-        toolbar.appendChild(starToggle)
+        capsule.appendChild(starBtn)
 
         // 📋 导出 Markdown 大纲
         const exportBtn = document.createElement('button')
-        exportBtn.className = 'dsh-rail-tool-btn'
-        exportBtn.title = '复制整场对话 Markdown 大纲'
+        exportBtn.className = 'dsh-top-btn'
+        exportBtn.title = '复制整场对话大纲为 Markdown'
         exportBtn.innerHTML = `
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="5" width="8" height="9" rx="1.5"/>
@@ -312,44 +635,30 @@ export function apply(ctx: ClientContext): void {
             })
           }
         }
-        toolbar.appendChild(exportBtn)
+        capsule.appendChild(exportBtn)
 
-        rail.appendChild(toolbar)
+        document.body.appendChild(capsule)
       }
+
+      const r = rail.getBoundingClientRect()
+      const right = Math.max(8, window.innerWidth - r.right)
+      capsule.style.right = `${right}px`
+      capsule.style.top = '78px'
     }
 
-    // 全局鼠标指针移动监听：无论直接停留在哪一个点，瞬时确保卡片带操作栏
-    const onPointerMove = (e: PointerEvent) => {
+    const timer = window.setInterval(() => {
       if (disposed) return
-      const target = e.target as HTMLElement | null
-      if (target && (target.closest('[class*="rail"], [class*="frame"]') || target.closest('[class*="preview"]'))) {
-        const card = document.querySelector<HTMLElement>('[class*="preview"]')
-        if (card) enhancePreviewCard(card)
-      }
-    }
-    window.addEventListener('pointermove', onPointerMove, { passive: true })
-
-    const observer = new MutationObserver(() => {
-      if (disposed) return
-      injectRailToolbar()
+      renderTopCapsule()
       updateRailMarks()
-      const cards = document.querySelectorAll<HTMLElement>('[class*="preview"]')
-      cards.forEach(enhancePreviewCard)
-    })
-    observer.observe(document.body, { childList: true, subtree: true })
-
-    const interval = window.setInterval(() => {
-      if (disposed) return
-      injectRailToolbar()
-      updateRailMarks()
-    }, 1500)
+    }, 1000)
 
     return () => {
       disposed = true
-      observer.disconnect()
-      window.removeEventListener('pointermove', onPointerMove)
-      window.clearInterval(interval)
-      document.querySelector('.dsh-rail-toolbar')?.remove()
+      window.removeEventListener('mousemove', onMouseMove)
+      window.clearInterval(timer)
+      window.clearTimeout(hideTimer)
+      currentCard?.remove()
+      document.querySelector('.dsh-top-capsule')?.remove()
     }
   }, 'dsh-chat-toc: native in-place augment')
 }
