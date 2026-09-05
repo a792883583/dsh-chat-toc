@@ -1,11 +1,9 @@
 /**
  * DSH 官方 Turn Rail 原生深度增强插件:
- * - 智能提取用户提问 + AI 核心回答：向后遍历本轮正文，完美呈现「提问 + 回复预览」，绝不丢失 AI 回答
- * - 永久持久化：基于稳定会话 ID (Session ID) + 消息稳定标识 (chatAnchorKey)
- * - 顶部极简原生小工具条：无生硬外阴影，纯粹扁平，微透呼吸感
- * - 过滤模式高亮：点击顶部 ⭐ 按钮时，收藏项强制亮金黄色 (100% 绝对不透明发光)，未收藏线条深度淡化
- * - 顶部胶囊工具条：🔍 搜索、⭐ 收藏过滤、📋 导出 Markdown 大纲
- * - 自主悬停卡片：300ms 防抖，鼠标移入稳稳停住，可从容点击操作
+ * - 紧邻 Session 日志按钮：直接挂载在右上角操作栏流内，与 Session 日志同排，彻底消灭双滚动条与任何错位！
+ * - 智能提取用户提问 + AI 核心回答：呈现完整卡片双向预览，300ms 悬停防抖不闪退
+ * - 永久持久化：基于会话 ID (Session ID) + 消息全局稳定指纹 (chatAnchorKey)
+ * - 顶部极简扁平工具胶囊：🔍 搜索、⭐ 收藏过滤、📋 导出 Markdown 大纲
  * @module dsh-chat-toc/client/index
  */
 
@@ -123,29 +121,25 @@ html.dark .dsh-enhanced-preview-response {
   font-weight: 600;
 }
 
-/* 3. 顶部固定胶囊工具条：彻底移除多余生硬阴影，扁平极简原生风 */
+/* 3. 紧邻 Session 日志按钮排列的轻量工具条：100% 消除双滚动条与错位 */
 .dsh-top-capsule {
-  position: fixed;
-  z-index: 998;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  background: transparent;
-  border: 1px solid rgba(128, 128, 128, 0.2);
+  background: var(--dsw-alias-surface-overlay, #ffffff);
+  border: 1px solid rgba(128, 128, 128, 0.22);
   border-radius: 8px;
   box-shadow: none !important;
-  padding: 2px 3px;
-  transition: all 0.15s ease;
+  padding: 2px 4px;
+  margin-right: 8px;
+  vertical-align: middle;
   pointer-events: auto;
+  white-space: nowrap;
 }
-.dsh-top-capsule:hover {
-  background: var(--dsw-alias-surface-overlay, rgba(255, 255, 255, 0.85));
-  border-color: rgba(128, 128, 128, 0.35);
-}
-[data-ds-dark-theme] .dsh-top-capsule:hover,
-[data-theme="dark"] .dsh-top-capsule:hover,
-html.dark .dsh-top-capsule:hover {
+[data-ds-dark-theme] .dsh-top-capsule,
+[data-theme="dark"] .dsh-top-capsule,
+html.dark .dsh-top-capsule {
   background: #1f2937;
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .dsh-top-btn {
@@ -315,13 +309,11 @@ export function apply(ctx: ClientContext): void {
       card.onmouseenter = () => window.clearTimeout(hideTimer)
       card.onmouseleave = () => scheduleHide()
 
-      // 👤 用户提问
       const promptEl = document.createElement('div')
       promptEl.className = 'dsh-enhanced-preview-prompt'
       promptEl.textContent = promptText || `第 ${turnIndex + 1} 轮对话`
       card.appendChild(promptEl)
 
-      // 🤖 AI 核心回复
       if (responseText) {
         const respEl = document.createElement('div')
         respEl.className = 'dsh-enhanced-preview-response'
@@ -454,7 +446,6 @@ export function apply(ctx: ClientContext): void {
       })
     }
 
-    // 提取提问与后续真正 AI 核心回答的高精度算法
     const extractTurnContent = (activeIdx: number, centerY: number): { key: string; promptText: string; responseText: string } => {
       const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
       const promptRows = allRows.filter((r) => r.dataset.chatFlowKind === 'user' || r.querySelector('[class*="UserStyleBubble"]'))
@@ -471,18 +462,14 @@ export function apply(ctx: ClientContext): void {
       let responseText = ''
       const startIndex = allRows.indexOf(userRow)
       if (startIndex >= 0) {
-        // 向后逐一扫描，越过中间的 tool/process，找到真正包含正文文本的 assistant 回复
         for (let j = startIndex + 1; j < allRows.length; j++) {
           const nextRow = allRows[j]
-          // 如果遇到了下一个用户提问，停止扫描
           if (nextRow.dataset.chatFlowKind === 'user' || nextRow.querySelector('[class*="UserStyleBubble"]')) {
             break
           }
-          // 优先抓取 markdown 正文段落或纯文本
           const contentEl = nextRow.querySelector<HTMLElement>('[class*="markdown"], [class*="Markdown"], [class*="messageContent"], [class*="bubble"]') || nextRow
           const rawText = (contentEl.textContent || '').replace(/\s+/g, ' ').trim()
           
-          // 过滤掉纯英文小标签或极短状态词
           if (rawText && rawText.length > 15 && !rawText.startsWith('pwsh -Command') && !rawText.startsWith('read ')) {
             responseText = rawText.slice(0, 160)
             break
@@ -512,6 +499,7 @@ export function apply(ctx: ClientContext): void {
       if ((markPos || mark) && rail) {
         const rect = (markPos || mark || rail).getBoundingClientRect()
         const centerY = rect.top + rect.height / 2
+        
         const rightDist = window.innerWidth - rail.getBoundingClientRect().left + 12
 
         const markElements = Array.from(rail.querySelectorAll<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]'))
@@ -525,11 +513,13 @@ export function apply(ctx: ClientContext): void {
     }
     window.addEventListener('mousemove', onMouseMove, { passive: true })
 
-    // 4. 顶部无生硬阴影的扁平化工具条
-    const renderTopCapsule = () => {
-      const rail = document.querySelector<HTMLElement>('[class*="frame"], [class*="_frame"]')
-      if (!rail) {
-        document.querySelector('.dsh-top-capsule')?.remove()
+    // 4. 插入在 Session 日志 按钮左侧的常规流工具条（绝不死锁、绝不撑破 body）
+    const syncTopCapsule = () => {
+      // 查找包含 Session 日志 的按钮
+      const allButtons = Array.from(document.querySelectorAll<HTMLElement>('button'))
+      const logBtn = allButtons.find((b) => (b.textContent || '').includes('Session 日志') || (b.textContent || '').includes('Session') && (b.textContent || '').includes('日志'))
+      
+      if (!logBtn || !logBtn.parentElement) {
         return
       }
 
@@ -637,20 +627,16 @@ export function apply(ctx: ClientContext): void {
         }
         capsule.appendChild(exportBtn)
 
-        document.body.appendChild(capsule)
+        // 插入到 Session 日志 按钮的前面！
+        logBtn.parentElement.insertBefore(capsule, logBtn)
       }
-
-      const r = rail.getBoundingClientRect()
-      const right = Math.max(8, window.innerWidth - r.right)
-      capsule.style.right = `${right}px`
-      capsule.style.top = '78px'
     }
 
     const timer = window.setInterval(() => {
       if (disposed) return
-      renderTopCapsule()
+      syncTopCapsule()
       updateRailMarks()
-    }, 1000)
+    }, 400)
 
     return () => {
       disposed = true

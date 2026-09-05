@@ -2,7 +2,7 @@
 
 [中文说明](./README.md) · [Documentación en Español](./README.es.md)
 
-A native conversation navigation and table-of-contents enhancer for the DSH Web GUI: **deeply supercharges the official native Turn Rail** without adding redundant parallel tracks. Provides dual-layer preview popovers (User prompt + AI response), one-click bookmarks with golden glowing highlights, session-scoped persistent storage, and an ultra-clean flat capsule toolbar (Search / Starred filter / Markdown export).
+A native conversation navigation and table-of-contents enhancer for the DSH Web GUI: **deeply supercharges the official native Turn Rail** without adding redundant parallel tracks. Provides dual-layer preview popovers (User prompt + AI response), one-click bookmarks with golden glowing highlights, session-scoped persistent storage, and an ultra-clean inline top toolbar (Search / Starred filter / Markdown export).
 
 ## Features
 
@@ -19,8 +19,8 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
   - Scoped by stable **Session ID + message unique anchor keys (`chatAnchorKey`)**.
   - Survives page refreshes and browser restarts without losing any starred marks; clears only when the session is archived or deleted.
 
-- **Flat Native Top Capsule Toolbar**:
-  - Docked right above the rail in the golden negative-space header zone; **drop-shadows completely removed** for a crisp, flat native feel.
+- **Inline Native Top Toolbar**:
+  - Embedded right beside the "Session Logs" action button in the native top bar; avoids sidebar collisions and never causes dual body scrollbars.
   - **🔍 Quick Query Search**: Expands an inline search bar smoothly to the left; matches glow blue on the rail and smooth-scroll to the target turn immediately; press `Esc` to collapse.
   - **⭐ Starred-Only Filter**: Turns unstarred marks into subtle 8% opacities, while starred marks illuminate into **22px elongated golden lines with ambient particle glows**.
   - **📋 Export Markdown Outline**: One-click button to extract the entire conversation turn hierarchy as formatted Markdown.
@@ -31,7 +31,7 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
 
 ## Screenshots
 
-**1. Hover Card (Prompt + AI Response Preview with Inlined Star/Copy actions, and the Flat Top Capsule Toolbar):**
+**1. Hover Card (Prompt + AI Response Preview with Inlined Star/Copy actions, and the Inline Top Toolbar):**
 
 ![Hover Card Preview](docs/toc-pop.png)
 
