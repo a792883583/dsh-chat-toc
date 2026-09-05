@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-toc",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "DSH web GUI chat table-of-contents: native Turn Rail enhancer with rich previews, bookmarks, search, and Markdown outline export.",
   "license": "MIT",
   "author": "Jaden Tang <jaden.tang@sjfood.com>",
