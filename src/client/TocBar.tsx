@@ -1,17 +1,15 @@
 /**
- * DSH 原生 Turn Rail 增强大纲面板：
- * 不再重复渲染第二条冗余轨道，而是为官方原生导航轨注入：
- * - 顶部一键展开大纲悬浮按钮
- * - 全局快捷键 Cmd/Ctrl + Shift + O
- * - 实时搜索、加星收藏、导出 Markdown 大纲、Pin 钉住固定
- * - 点击消息平滑跳转
+ * DSH 官方 Turn Rail 原生无缝增强套件：
+ * - 在右侧折叠按钮上方挂载精致的大纲面板按钮 (📑)
+ * - 支持全局快捷键 Cmd/Ctrl + Shift + O 一键滑出/收起大纲抽屉
+ * - 完整支持：实时关键词搜索、消息加星收藏 (⭐)、Markdown 大纲导出 (📋)、面板固定 (📌)
+ * - 点击消息平滑滚动至对应气泡
  * @module dsh-chat-toc/client/TocBar
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from './i18n.ts'
 
-/** 一条对话消息的目录项。 */
 export interface TocItem {
   key: string
   kind: string
@@ -22,7 +20,7 @@ export interface TocItem {
 }
 
 const STYLE = `
-.dsh-toc-overlay {
+.dsh-toc-wrap {
   --toc-fg: #24292f;
   --toc-muted: #6e7781;
   --toc-bg: #ffffff;
@@ -33,78 +31,80 @@ const STYLE = `
   --toc-assistant: #16a34a;
   --toc-other: #8b949e;
   position: fixed;
-  z-index: 950;
+  z-index: 999;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   pointer-events: none;
 }
-[data-ds-dark-theme] .dsh-toc-overlay,
-[data-theme="dark"] .dsh-toc-overlay,
-html.dark .dsh-toc-overlay {
+[data-ds-dark-theme] .dsh-toc-wrap,
+[data-theme="dark"] .dsh-toc-wrap,
+html.dark .dsh-toc-wrap {
   --toc-fg: #f3f4f6;
   --toc-muted: #9ca3af;
   --toc-bg: #1f2937;
-  --toc-border: rgba(255, 255, 255, 0.12);
+  --toc-border: rgba(255, 255, 255, 0.14);
   --toc-hover: rgba(255, 255, 255, 0.08);
   --toc-accent: #3b82f6;
   --toc-user: #3b82f6;
   --toc-assistant: #22c55e;
   --toc-other: #9ca3af;
 }
-.dsh-toc-overlay * { box-sizing: border-box; }
+.dsh-toc-wrap * { box-sizing: border-box; }
 
-/* 挂载在官方 Rail 顶部的快捷大纲小胶囊按钮 */
-.dsh-toc-trigger {
-  position: absolute;
+/* 浮动常驻触发按钮：优雅停靠在右侧折叠小按钮上方 */
+.dsh-toc-launcher {
+  position: fixed;
   pointer-events: auto;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   background: var(--toc-bg);
   border: 1px solid var(--toc-border);
   color: var(--toc-muted);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s ease;
-  transform: translateX(-50%);
+  z-index: 1000;
 }
-.dsh-toc-trigger:hover, .dsh-toc-trigger.active {
+.dsh-toc-launcher:hover, .dsh-toc-launcher.open {
   color: var(--toc-accent);
   border-color: var(--toc-accent);
-  transform: translateX(-50%) scale(1.08);
+  background: var(--toc-bg);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
-/* 展开的完整大纲面板 */
-.dsh-toc-panel {
-  position: absolute;
+/* 弹出的大纲侧边抽屉面板 */
+.dsh-toc-drawer {
+  position: fixed;
   pointer-events: auto;
-  width: 320px;
-  max-height: 75vh;
+  width: 330px;
+  max-height: 80vh;
   background: var(--toc-bg);
   border: 1px solid var(--toc-border);
   border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
-  padding: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  animation: dshTocFadeIn 0.15s ease-out;
+  animation: dshTocSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1001;
 }
-@keyframes dshTocFadeIn {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes dshTocSlide {
+  from { opacity: 0; transform: translateX(8px) scale(0.98); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 
-.dsh-toc-head {
+.dsh-toc-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 4px 8px;
+  padding: 2px 2px 10px;
   border-bottom: 1px solid var(--toc-border);
   margin-bottom: 8px;
 }
-.dsh-toc-title {
+.dsh-toc-heading {
   font-size: 13px;
   font-weight: 600;
   color: var(--toc-fg);
@@ -113,23 +113,23 @@ html.dark .dsh-toc-overlay {
   gap: 6px;
   flex: 1;
 }
-.dsh-toc-btn {
+.dsh-toc-action {
   border: none;
   background: transparent;
   color: var(--toc-muted);
   cursor: pointer;
-  padding: 4px;
+  padding: 5px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 0;
-  transition: background 0.12s, color 0.12s;
+  transition: all 0.12s ease;
 }
-.dsh-toc-btn:hover { background: var(--toc-hover); color: var(--toc-fg); }
-.dsh-toc-btn.active { color: var(--toc-accent); background: var(--toc-hover); }
+.dsh-toc-action:hover { background: var(--toc-hover); color: var(--toc-fg); }
+.dsh-toc-action.active { color: var(--toc-accent); background: var(--toc-hover); }
 
-.dsh-toc-search {
+.dsh-toc-input {
   width: 100%;
   padding: 6px 10px;
   margin-bottom: 8px;
@@ -139,32 +139,33 @@ html.dark .dsh-toc-overlay {
   border: 1px solid var(--toc-border);
   border-radius: 6px;
   outline: none;
+  transition: border-color 0.12s;
 }
-.dsh-toc-search:focus { border-color: var(--toc-accent); }
-.dsh-toc-search::placeholder { color: var(--toc-muted); }
+.dsh-toc-input:focus { border-color: var(--toc-accent); }
+.dsh-toc-input::placeholder { color: var(--toc-muted); }
 
-.dsh-toc-list {
+.dsh-toc-scroll {
   overflow-y: auto;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: calc(75vh - 110px);
+  max-height: calc(80vh - 110px);
 }
-.dsh-toc-item {
+.dsh-toc-row {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
   color: var(--toc-fg);
   transition: background 0.1s;
 }
-.dsh-toc-item:hover, .dsh-toc-item.current { background: var(--toc-hover); }
-.dsh-toc-item-row { display: flex; align-items: center; gap: 6px; }
-.dsh-toc-item .bar {
+.dsh-toc-row:hover { background: var(--toc-hover); }
+.dsh-toc-row-main { display: flex; align-items: center; gap: 6px; }
+.dsh-toc-bar-line {
   flex: none;
   width: 3px;
   height: 14px;
@@ -172,9 +173,9 @@ html.dark .dsh-toc-overlay {
   background: var(--toc-other);
   opacity: 0.7;
 }
-.dsh-toc-item .bar.user { background: var(--toc-user); }
-.dsh-toc-item .bar.assistant { background: var(--toc-assistant); }
-.dsh-toc-item .num {
+.dsh-toc-bar-line.user { background: var(--toc-user); }
+.dsh-toc-bar-line.assistant { background: var(--toc-assistant); }
+.dsh-toc-idx {
   flex: none;
   min-width: 18px;
   text-align: right;
@@ -182,7 +183,7 @@ html.dark .dsh-toc-overlay {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.dsh-toc-badge {
+.dsh-toc-tag {
   flex: none;
   font-size: 9px;
   font-weight: 600;
@@ -191,10 +192,10 @@ html.dark .dsh-toc-overlay {
   line-height: 1.2;
   text-transform: uppercase;
 }
-.dsh-toc-badge.code { background: rgba(59, 130, 246, 0.15); color: var(--toc-accent); }
-.dsh-toc-badge.tool { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
-.dsh-toc-badge.error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
-.dsh-toc-item .text {
+.dsh-toc-tag.code { background: rgba(59, 130, 246, 0.15); color: var(--toc-accent); }
+.dsh-toc-tag.tool { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
+.dsh-toc-tag.error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.dsh-toc-desc {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -203,7 +204,7 @@ html.dark .dsh-toc-overlay {
   line-height: 1.4;
   font-size: 12px;
 }
-.dsh-toc-preview-box {
+.dsh-toc-subpreview {
   font-size: 11px;
   opacity: 0.8;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -216,7 +217,7 @@ html.dark .dsh-toc-overlay {
   max-height: 44px;
   overflow: hidden;
 }
-.dsh-toc-empty {
+.dsh-toc-nodata {
   padding: 24px 8px;
   text-align: center;
   font-size: 12px;
@@ -240,18 +241,17 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   const { scrollEl, items } = props
   const t = useT()
 
-  // 如果没有实际消息，静默不渲染
   if (items.length === 0) return null
 
   ensureStyle()
 
-  const [coords, setCoords] = useState<{ right: number; top: number }>({ right: 36, top: 120 })
+  // 坐标：停靠在折叠按钮上方
+  const [pos, setPos] = useState<{ right: number; top: number }>({ right: 6, top: 300 })
   const [open, setOpen] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [query, setQuery] = useState('')
   const [copied, setCopied] = useState(false)
   const [starOnly, setStarOnly] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
 
   const [starred, setStarred] = useState<Set<string>>(() => {
     try {
@@ -290,7 +290,7 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     }
   }, [items, starred])
 
-  // 全局快捷键 Cmd/Ctrl + Shift + O
+  // 快捷键 Cmd/Ctrl + Shift + O
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'o' || e.key === 'O')) {
@@ -304,43 +304,48 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     return () => window.removeEventListener('keydown', onKey)
   }, [open, pinned])
 
-  // 测量并对齐到官方原生的 Turn Rail 轨道
+  // 定位计算：检测官方折叠箭头按钮或轨道，紧邻其左上方停靠
   useEffect(() => {
-    const updatePosition = () => {
-      const rail = document.querySelector<HTMLElement>('[class*="rail"], [class*="_frame"]')
-      if (rail !== null) {
-        const r = rail.getBoundingClientRect()
-        setCoords({
-          right: Math.max(16, window.innerWidth - r.left + 8),
-          top: Math.max(40, r.top),
+    const measure = () => {
+      const toggle = document.querySelector<HTMLElement>('button[aria-label*="collapse" i], button[aria-label*="折叠" i], [class*="collapseBtn"]')
+      if (toggle !== null) {
+        const r = toggle.getBoundingClientRect()
+        setPos({
+          right: Math.max(8, window.innerWidth - r.right),
+          top: Math.max(40, r.top - 36),
         })
       } else {
-        const r = scrollEl.getBoundingClientRect()
-        setCoords({
-          right: Math.max(24, window.innerWidth - r.right + 24),
-          top: Math.max(40, r.top + 60),
-        })
+        const rail = document.querySelector<HTMLElement>('[class*="rail"], [class*="_frame"]')
+        if (rail !== null) {
+          const r = rail.getBoundingClientRect()
+          setPos({
+            right: Math.max(8, window.innerWidth - r.right),
+            top: Math.max(40, r.top - 36),
+          })
+        } else {
+          setPos({ right: 12, top: 260 })
+        }
       }
     }
-    updatePosition()
-    window.addEventListener('resize', updatePosition)
-    const timer = window.setInterval(updatePosition, 1000)
+    measure()
+    window.addEventListener('resize', measure)
+    const interval = window.setInterval(measure, 1000)
     return () => {
-      window.removeEventListener('resize', updatePosition)
-      window.clearInterval(timer)
+      window.removeEventListener('resize', measure)
+      window.clearInterval(interval)
     }
   }, [scrollEl])
 
-  const filteredItems = useMemo(() => {
-    let result = items
+  const filtered = useMemo(() => {
+    let list = items
     if (starOnly) {
-      result = result.filter((item) => starred.has(item.key))
+      list = list.filter((it) => starred.has(it.key))
     }
     if (query.trim()) {
       const q = query.trim().toLowerCase()
-      result = result.filter((item) => item.text.toLowerCase().includes(q) || (item.preview ?? '').toLowerCase().includes(q))
+      list = list.filter((it) => it.text.toLowerCase().includes(q) || (it.preview ?? '').toLowerCase().includes(q))
     }
-    return result
+    return list
   }, [items, starOnly, query, starred])
 
   const jumpTo = useCallback((item: TocItem) => {
@@ -349,39 +354,40 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   }, [pinned])
 
   return (
-    <div className="dsh-toc-overlay" style={{ right: coords.right, top: coords.top }}>
-      {/* 挂载在原生轨道顶侧的胶囊大纲快捷按钮 */}
+    <div className="dsh-toc-wrap">
+      {/* 极简常驻大纲按钮：停靠在折叠按钮正上方 */}
       <button
         type="button"
-        className={`dsh-toc-trigger${open ? ' active' : ''}`}
-        style={{ top: -34, right: 0 }}
+        className={`dsh-toc-launcher${open ? ' open' : ''}`}
+        style={{ right: pos.right, top: pos.top }}
         title={`${t('toc.title')} (Ctrl+Shift+O)`}
         onClick={() => setOpen((v) => !v)}
       >
-        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h7" />
         </svg>
       </button>
 
-      {/* 展开的完整大纲面板 */}
+      {/* 点击弹出的完整大纲抽屉 */}
       {open ? (
-        <div ref={panelRef} className="dsh-toc-panel" style={{ right: 0, top: 0 }}>
-          <div className="dsh-toc-head">
-            <span className="dsh-toc-title">
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="dsh-toc-drawer" style={{ right: pos.right + 34, top: Math.max(30, pos.top - 120) }}>
+          <div className="dsh-toc-header">
+            <span className="dsh-toc-heading">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2 3.5h12M2 8h12M2 12.5h8" />
               </svg>
               {t('toc.title')}
+              <span style={{ fontSize: 11, fontWeight: 'normal', opacity: 0.6 }}>({items.length})</span>
             </span>
 
             {/* 仅看收藏 */}
             <button
               type="button"
-              className={`dsh-toc-btn${starOnly ? ' active' : ''}`}
+              className={`dsh-toc-action${starOnly ? ' active' : ''}`}
               title={t('toc.starOnly')}
               onClick={() => setStarOnly((v) => !v)}
             >
-              <svg viewBox="0 0 16 16" width="13" height="13" fill={starOnly ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill={starOnly ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
                 <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
               </svg>
             </button>
@@ -389,39 +395,39 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
             {/* 复制大纲 */}
             <button
               type="button"
-              className="dsh-toc-btn"
+              className="dsh-toc-action"
               title={copied ? t('toc.exported') : t('toc.export')}
               onClick={exportMarkdown}
             >
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="5" y="5" width="8" height="9" rx="1.5" />
                 <path d="M3 11V3.5A1.5 1.5 0 014.5 2H10" />
               </svg>
             </button>
 
-            {/* 钉住固定 */}
+            {/* 固定面板 */}
             <button
               type="button"
-              className={`dsh-toc-btn${pinned ? ' active' : ''}`}
+              className={`dsh-toc-action${pinned ? ' active' : ''}`}
               title={pinned ? '取消固定' : '固定面板'}
               onClick={() => setPinned((v) => !v)}
             >
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 2v4l-2 2v2h4.5v4l.5.5.5-.5V10H14V8l-2-2V2z" />
               </svg>
             </button>
 
-            {/* 关闭按钮 */}
+            {/* 关闭 */}
             <button
               type="button"
-              className="dsh-toc-btn"
+              className="dsh-toc-action"
               title="关闭"
               onClick={() => {
                 setOpen(false)
                 setPinned(false)
               }}
             >
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
               </svg>
             </button>
@@ -429,40 +435,40 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
 
           <input
             type="text"
-            className="dsh-toc-search"
+            className="dsh-toc-input"
             placeholder={t('toc.search')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
 
-          <div className="dsh-toc-list">
-            {filteredItems.length === 0 ? (
-              <div className="dsh-toc-empty">
+          <div className="dsh-toc-scroll">
+            {filtered.length === 0 ? (
+              <div className="dsh-toc-nodata">
                 {starOnly ? t('toc.starEmpty') : query ? t('toc.searchEmpty') : t('toc.empty')}
               </div>
             ) : (
-              filteredItems.map((item, idx) => (
-                <div key={item.key} className="dsh-toc-item" onClick={() => jumpTo(item)}>
-                  <div className="dsh-toc-item-row">
-                    <span className={`bar ${DOT_COLOR[item.kind] ?? ''}`} />
-                    <span className="num">{idx + 1}</span>
-                    {item.tag ? <span className={`dsh-toc-badge ${item.tag}`}>{item.tag}</span> : null}
-                    <span className="text" title={item.text}>{item.text}</span>
+              filtered.map((item, idx) => (
+                <div key={item.key} className="dsh-toc-row" onClick={() => jumpTo(item)}>
+                  <div className="dsh-toc-row-main">
+                    <span className={`dsh-toc-bar-line ${DOT_COLOR[item.kind] ?? ''}`} />
+                    <span className="dsh-toc-idx">{idx + 1}</span>
+                    {item.tag ? <span className={`dsh-toc-tag ${item.tag}`}>{item.tag}</span> : null}
+                    <span className="dsh-toc-desc" title={item.text}>{item.text}</span>
                     <button
                       type="button"
-                      className="dsh-toc-btn"
+                      className="dsh-toc-action"
                       onClick={(e) => {
                         e.stopPropagation()
                         toggleStar(item.key)
                       }}
                       title={starred.has(item.key) ? t('toc.starRemove') : t('toc.starAdd')}
                     >
-                      <svg viewBox="0 0 16 16" width="12" height="12" fill={starred.has(item.key) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+                      <svg viewBox="0 0 16 16" width="13" height="13" fill={starred.has(item.key) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
                         <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z" />
                       </svg>
                     </button>
                   </div>
-                  {item.preview ? <div className="dsh-toc-preview-box">{item.preview}</div> : null}
+                  {item.preview ? <div className="dsh-toc-subpreview">{item.preview}</div> : null}
                 </div>
               ))
             )}
