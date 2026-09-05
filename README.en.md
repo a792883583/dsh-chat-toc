@@ -33,11 +33,11 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
 
 **1. Hover Card (Prompt + AI Response Preview with Inlined Star/Copy actions, and the Inline Top Toolbar):**
 
-![Hover Card Preview](docs/toc-pop.png)
+![Hover Card Preview](docs/toc-pop.png?v=0.4.3)
 
 **2. Starred Filter Active (Starred marks shine in golden glow, non-starred marks dim down):**
 
-![Rail Marks Highlight](docs/toc-bar.png)
+![Rail Marks Highlight](docs/toc-bar.png?v=0.4.3)
 
 ## Installation
 
