@@ -1,11 +1,8 @@
 /**
- * DSH 官方 Turn Rail 原生无缝注入增强插件：
- * - 劫持官方悬浮卡片（[class*="preview"]），在卡片内直接注入 ⭐ 收藏与 📋 复制按钮
- * - 在官方导航轨（[class*="frame"]）顶部挂载原生的极简小工具条：
- *   - ⭐ 收藏过滤（在官方轨道上高亮收藏的轮次）
- *   - 🔍 轮次关键词快速搜索
- *   - 📋 一键导出对话 Markdown 大纲
- * - 彻底告别冗余轨道与突兀悬浮大窗，100% 融入 DSH 原生 UI
+ * DSH 官方 Turn Rail 原生增强插件：
+ * - 零破坏性：不修改官方卡片的任何尺寸与定位属性，彻底避免页面横向撑开产生滚动条
+ * - 在官方预览卡片内部底部添加轻巧的操作栏（⭐ 收藏、📋 复制）
+ * - 在官方导航轨上方集成极简工具胶囊
  * @module dsh-chat-toc/client/index
  */
 
@@ -23,59 +20,55 @@ interface ClientContext {
 export const inject = ['locale']
 
 const STYLE = `
-/* 官方悬浮预览卡片内的操作条 */
-[class*="preview"] {
-  position: relative !important;
-  min-width: 240px;
-}
-.dsh-native-preview-actions {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+/* 绝不碰 [class*="preview"] 的 position / width / min-width，保持官方原装计算 */
+.dsh-card-action-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(128, 128, 128, 0.12);
-  backdrop-filter: blur(8px);
-  padding: 2px 4px;
-  border-radius: 6px;
-  z-index: 10;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
+  font-size: 11px;
 }
-.dsh-native-preview-btn {
+.dsh-card-action-btn {
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-tertiary, #8b949e);
   cursor: pointer;
-  padding: 3px;
+  padding: 2px 5px;
   border-radius: 4px;
-  line-height: 0;
-  transition: all 0.12s ease;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 3px;
+  line-height: 1;
+  transition: all 0.1s ease;
+  font-size: 11px;
 }
-.dsh-native-preview-btn:hover {
-  background: rgba(128, 128, 128, 0.2);
+.dsh-card-action-btn:hover {
+  background: rgba(128, 128, 128, 0.15);
   color: var(--dsw-alias-label-primary, currentColor);
 }
-.dsh-native-preview-btn.starred {
+.dsh-card-action-btn.starred {
   color: #eab308;
+  font-weight: 600;
 }
 
-/* 官方轨道顶部的原生小工具条：随着官方小地图顶部自然定位 */
+/* 官方轨道顶部小胶囊，不产生任何横向溢出 */
 .dsh-rail-toolbar {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   right: 0;
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--dsw-alias-surface-overlay, rgba(128,128,128,0.12));
-  border: 1px solid var(--dsw-alias-border-l4, rgba(128,128,128,0.2));
+  background: rgba(128, 128, 128, 0.1);
+  border: 1px solid rgba(128, 128, 128, 0.2);
   border-radius: 6px;
-  padding: 2px 3px;
-  backdrop-filter: blur(12px);
-  z-index: 99;
+  padding: 1px 2px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+  overflow: hidden;
 }
 .dsh-rail-tool-btn {
   border: none;
@@ -88,59 +81,22 @@ const STYLE = `
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.12s ease;
 }
 .dsh-rail-tool-btn:hover {
   background: rgba(128, 128, 128, 0.2);
-  color: var(--dsw-alias-label-primary, currentColor);
+  color: currentColor;
 }
 .dsh-rail-tool-btn.active {
   color: #eab308;
-  background: rgba(234, 179, 8, 0.15);
 }
 
-/* 搜索小浮层 */
-.dsh-rail-search-box {
-  position: absolute;
-  bottom: calc(100% + 40px);
-  right: 0;
-  width: 220px;
-  background: var(--dsw-alias-surface-overlay, #ffffff);
-  border: 1px solid var(--dsw-alias-border-l4, rgba(128,128,128,0.25));
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-  padding: 6px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-[data-ds-dark-theme] .dsh-rail-search-box,
-[data-theme="dark"] .dsh-rail-search-box,
-html.dark .dsh-rail-search-box {
-  background: #1f2937;
-}
-.dsh-rail-search-input {
-  flex: 1;
-  border: 1px solid var(--dsw-alias-border-l4, rgba(128,128,128,0.2));
-  background: transparent;
-  color: currentColor;
-  font-size: 12px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  outline: none;
-}
-.dsh-rail-search-input:focus {
-  border-color: #3b82f6;
-}
-
-/* 当开启收藏过滤时，未收藏的 mark 淡化，已收藏的 mark 变金黄色 */
-.dsh-filter-starred [class*="mark"]:not(.dsh-mark-starred):before {
-  opacity: 0.15 !important;
-}
+/* 收藏高亮 */
 [class*="mark"].dsh-mark-starred:before {
   background: #eab308 !important;
-  width: 20px !important;
+  width: 18px !important;
+}
+.dsh-filter-starred [class*="mark"]:not(.dsh-mark-starred):before {
+  opacity: 0.15 !important;
 }
 `
 
@@ -182,30 +138,28 @@ export function apply(ctx: ClientContext): void {
     }
 
     let starOnly = false
-    let searchOpen = false
-    let searchQuery = ''
 
-    // 1. 劫持官方预览卡片：右上角直接嵌入 ⭐ 收藏 与 📋 复制
+    // 在官方卡片内部末尾追加操作栏
     const enhancePreviewCard = (card: HTMLElement) => {
-      if (card.querySelector('.dsh-native-preview-actions') !== null) return
+      if (card.querySelector('.dsh-card-action-row') !== null) return
 
       const promptEl = card.querySelector('[class*="previewPrompt"]')
       const textKey = (promptEl?.textContent || card.textContent || '').trim().slice(0, 40)
       if (!textKey) return
 
-      const actions = document.createElement('div')
-      actions.className = 'dsh-native-preview-actions'
+      const row = document.createElement('div')
+      row.className = 'dsh-card-action-row'
 
-      // ⭐ 收藏按钮
+      // ⭐ 收藏
       const starBtn = document.createElement('button')
-      starBtn.className = 'dsh-native-preview-btn'
+      starBtn.className = 'dsh-card-action-btn'
       const isStarred = getStarred().has(textKey)
       if (isStarred) starBtn.classList.add('starred')
-      starBtn.title = isStarred ? '取消收藏' : '收藏此条'
       starBtn.innerHTML = `
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
           <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z"/>
         </svg>
+        <span>${isStarred ? '已收藏' : '收藏'}</span>
       `
       starBtn.onclick = (e) => {
         e.stopPropagation()
@@ -213,45 +167,48 @@ export function apply(ctx: ClientContext): void {
         if (set.has(textKey)) {
           set.delete(textKey)
           starBtn.classList.remove('starred')
-          starBtn.title = '收藏此条'
+          starBtn.querySelector('span')!.textContent = '收藏'
           starBtn.querySelector('svg')?.setAttribute('fill', 'none')
         } else {
           set.add(textKey)
           starBtn.classList.add('starred')
-          starBtn.title = '取消收藏'
+          starBtn.querySelector('span')!.textContent = '已收藏'
           starBtn.querySelector('svg')?.setAttribute('fill', 'currentColor')
         }
         setStarred(set)
         updateRailMarks()
       }
-      actions.appendChild(starBtn)
+      row.appendChild(starBtn)
 
-      // 📋 复制内容按钮
+      // 📋 复制
       const copyBtn = document.createElement('button')
-      copyBtn.className = 'dsh-native-preview-btn'
-      copyBtn.title = '复制提问与内容'
+      copyBtn.className = 'dsh-card-action-btn'
       copyBtn.innerHTML = `
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <rect x="5" y="5" width="8" height="9" rx="1.5"/>
           <path d="M3 11V3.5A1.5 1.5 0 014.5 2H10"/>
         </svg>
+        <span>复制</span>
       `
       copyBtn.onclick = (e) => {
         e.stopPropagation()
         const text = (card.textContent || '').trim()
         if (navigator?.clipboard?.writeText) {
           void navigator.clipboard.writeText(text).then(() => {
-            copyBtn.style.color = '#16a34a'
-            setTimeout(() => { copyBtn.style.color = '' }, 1500)
+            copyBtn.querySelector('span')!.textContent = '已复制'
+            setTimeout(() => {
+              if (copyBtn.querySelector('span')) {
+                copyBtn.querySelector('span')!.textContent = '复制'
+              }
+            }, 1500)
           })
         }
       }
-      actions.appendChild(copyBtn)
+      row.appendChild(copyBtn)
 
-      card.appendChild(actions)
+      card.appendChild(row)
     }
 
-    // 2. 根据收藏状态与搜索状态，高亮官方轨道上的 mark
     const updateRailMarks = () => {
       const rail = document.querySelector<HTMLElement>('[class*="frame"]')
       if (!rail) return
@@ -275,7 +232,7 @@ export function apply(ctx: ClientContext): void {
       })
     }
 
-    // 3. 在官方轨道顶部注入极简小工具条
+    // 在官方轨道顶部放入极其轻巧的小开关（仅看收藏与导出大纲）
     const injectRailToolbar = () => {
       const rail = document.querySelector<HTMLElement>('[class*="frame"]')
       if (!rail) return
@@ -285,12 +242,12 @@ export function apply(ctx: ClientContext): void {
         toolbar = document.createElement('div')
         toolbar.className = 'dsh-rail-toolbar'
 
-        // 🌟 仅看收藏切换
+        // 🌟 仅看收藏
         const starToggle = document.createElement('button')
         starToggle.className = 'dsh-rail-tool-btn'
-        starToggle.title = '过滤收藏'
+        starToggle.title = '仅高亮收藏的轮次'
         starToggle.innerHTML = `
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="${starOnly ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="${starOnly ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
             <path d="M8 2l1.7 3.6 4 .5-2.9 2.8.7 4L8 11.2 4.5 12.9l.7-4L2.3 6.1l4-.5z"/>
           </svg>
         `
@@ -303,29 +260,12 @@ export function apply(ctx: ClientContext): void {
         }
         toolbar.appendChild(starToggle)
 
-        // 🔍 快速搜索
-        const searchBtn = document.createElement('button')
-        searchBtn.className = 'dsh-rail-tool-btn'
-        searchBtn.title = '搜索消息'
-        searchBtn.innerHTML = `
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="7" cy="7" r="4.5"/>
-            <path d="M10.5 10.5L14 14"/>
-          </svg>
-        `
-        searchBtn.onclick = (e) => {
-          e.stopPropagation()
-          searchOpen = !searchOpen
-          renderSearchBox(rail)
-        }
-        toolbar.appendChild(searchBtn)
-
         // 📋 导出 Markdown 大纲
         const exportBtn = document.createElement('button')
         exportBtn.className = 'dsh-rail-tool-btn'
-        exportBtn.title = '导出对话 Markdown 大纲'
+        exportBtn.title = '复制整场对话 Markdown 大纲'
         exportBtn.innerHTML = `
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="5" width="8" height="9" rx="1.5"/>
             <path d="M3 11V3.5A1.5 1.5 0 014.5 2H10"/>
           </svg>
@@ -353,42 +293,6 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
-    const renderSearchBox = (rail: HTMLElement) => {
-      let box = rail.querySelector<HTMLElement>('.dsh-rail-search-box')
-      if (!searchOpen) {
-        box?.remove()
-        return
-      }
-      if (!box) {
-        box = document.createElement('div')
-        box.className = 'dsh-rail-search-box'
-        box.innerHTML = `
-          <input type="text" class="dsh-rail-search-input" placeholder="搜索轮次..." value="${searchQuery}" />
-          <button class="dsh-rail-tool-btn" style="padding:2px">✕</button>
-        `
-        const input = box.querySelector<HTMLInputElement>('input')!
-        const close = box.querySelector<HTMLButtonElement>('button')!
-        input.oninput = () => {
-          searchQuery = input.value.trim().toLowerCase()
-          if (searchQuery) {
-            const rows = document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
-            for (const r of rows) {
-              if ((r.textContent || '').toLowerCase().includes(searchQuery)) {
-                r.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                break
-              }
-            }
-          }
-        }
-        close.onclick = () => {
-          searchOpen = false
-          box?.remove()
-        }
-        rail.appendChild(box)
-        input.focus()
-      }
-    }
-
     const observer = new MutationObserver(() => {
       if (disposed) return
       injectRailToolbar()
@@ -409,9 +313,8 @@ export function apply(ctx: ClientContext): void {
       observer.disconnect()
       window.clearInterval(interval)
       document.querySelector('.dsh-rail-toolbar')?.remove()
-      document.querySelector('.dsh-rail-search-box')?.remove()
     }
-  }, 'dsh-chat-toc: native augment')
+  }, 'dsh-chat-toc: native in-place augment')
 }
 
 export default { apply, inject }
