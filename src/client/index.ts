@@ -67,10 +67,19 @@ export function apply(ctx: TocClientContext): void {
       if (collectRaf !== 0) return
       collectRaf = requestAnimationFrame(() => {
         collectRaf = 0
-        if (flow === null) return
+        const currentFlow = document.querySelector<HTMLElement>(FLOW_SELECTOR)
+        // 若当前处于新会话初始界面（无消息流或消息流已脱离/隐藏），立即清空目录
+        if (currentFlow === null || !currentFlow.isConnected) {
+          if (items.length > 0) {
+            items = []
+            render()
+          }
+          return
+        }
+
         const seen = new Set<string>()
         const next: TocItem[] = []
-        flow.querySelectorAll<HTMLElement>(ITEM_SELECTOR).forEach((el) => {
+        currentFlow.querySelectorAll<HTMLElement>(ITEM_SELECTOR).forEach((el) => {
           const key = el.dataset.chatAnchorKey ?? ''
           if (key === '' || seen.has(key)) return
           seen.add(key)
@@ -125,7 +134,17 @@ export function apply(ctx: TocClientContext): void {
     /** 绑定消息流容器（会话切换 / 组件重建后重新绑定）。 */
     const attach = (): void => {
       const nextFlow = document.querySelector<HTMLElement>(FLOW_SELECTOR)
-      if (nextFlow === null || nextFlow === flow) return
+      if (nextFlow === null) {
+        if (items.length > 0) {
+          items = []
+          render()
+        }
+        return
+      }
+      if (nextFlow === flow) {
+        collect()
+        return
+      }
       flow = nextFlow
       scrollEl = flow.closest<HTMLElement>(SCROLL_SELECTOR) ?? flow
       observer?.disconnect()
@@ -134,6 +153,19 @@ export function apply(ctx: TocClientContext): void {
       collect()
       console.debug('[dsh-chat-toc] attached', { flow, scrollEl })
     }
+
+    let lastUrl = window.location.href
+    const handleUrlChange = (): void => {
+      const cur = window.location.href
+      if (cur !== lastUrl) {
+        lastUrl = cur
+        items = []
+        render()
+        attach()
+      }
+    }
+    window.addEventListener('popstate', handleUrlChange)
+    window.addEventListener('hashchange', handleUrlChange)
 
     // 轮询等待会话 DOM 出现；attach 成功后停止（interval 兜底负责重建检测）。
     let raf = 0
@@ -149,9 +181,10 @@ export function apply(ctx: TocClientContext): void {
     }
     raf = requestAnimationFrame(poll)
 
-    // 兜底：流式输出文本刷新 + flow 重建检测（低频，避免常驻开销）。
+    // 兜底：流式输出文本刷新 + 会话切换检测 + flow 重建检测。
     interval = window.setInterval(() => {
       if (disposed) return
+      handleUrlChange()
       if (flow !== null && !flow.isConnected) {
         flow = null
         scrollEl = null

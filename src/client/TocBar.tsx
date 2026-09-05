@@ -177,16 +177,20 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     })
   }, [])
 
-  // 跟踪定位：目录条停靠在 git 面板折叠箭头的左侧（聊天区内侧）；
-  // 无箭头时回退到滚动容器右缘外侧。
+  // 跟踪定位：目录条停靠在 git 面板折叠箭头或侧边栏折叠按钮左侧（避让至少 30px 安全距离），
+  // 彻底避免与右侧折叠箭头（<）重叠遮挡。
   useEffect(() => {
     const measure = (): void => {
       const r = scrollEl.getBoundingClientRect()
       if (r.width === 0 && r.height === 0) return
-      const toggle = document.querySelector<HTMLElement>('[data-git-panel-toggle]')
-      const right = toggle !== null
-        ? window.innerWidth - toggle.getBoundingClientRect().left + 8
-        : window.innerWidth - r.right + 6
+      const gitToggle = document.querySelector<HTMLElement>('[data-git-panel-toggle]')
+      const sidebarToggle = document.querySelector<HTMLElement>('button[aria-label*="collapse" i], button[aria-label*="折叠" i], [class*="collapseBtn"]')
+      let right = window.innerWidth - r.right + 30
+      if (gitToggle !== null) {
+        right = Math.max(right, window.innerWidth - gitToggle.getBoundingClientRect().left + 8)
+      } else if (sidebarToggle !== null) {
+        right = Math.max(right, window.innerWidth - sidebarToggle.getBoundingClientRect().left + 8)
+      }
       setRect({ right, top: r.top, height: r.height })
     }
     measure()
