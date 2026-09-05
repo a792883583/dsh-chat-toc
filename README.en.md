@@ -2,23 +2,20 @@
 
 [中文](README.md) · [Español](README.es.md)
 
-A chat table-of-contents plugin for the DSH Web GUI: a book-style outline bar on the right edge of the conversation; hover to expand the outline, click any entry to jump to that message.
+A chat table-of-contents enhancement plugin for the DSH Web GUI: deeply integrates with and supercharges the official native Turn Rail without duplicate tracks; provides global shortcuts, search, bookmarks, and Markdown export.
 
 ## Features
 
-- **Outline bar**: hugs the right edge of the chat area (left of the Git panel's collapse arrow). Each message is a tick mark — the longer the mark, the more content; user messages are blue, assistant messages green
-- **Smart heading & summary extraction**: prioritizes Markdown headings (`##`) and key takeaway bold points as outline entries, keeping long technical threads and multi-step tasks organized without clutter
-- **Collision avoidance & responsive layout**: automatically shifts left to avoid overlapping the official collapse button (`<`) and Git panel controls
-- **Automatic session reset**: listens to SPA route/session navigation and clears stale outline entries instantly in fresh or empty sessions
-- **Current position highlight**: as you scroll, the mark for the current message is highlighted (synced between the bar and the popup list)
-- **Hover to expand & Pin open**: move the mouse onto the bar to reveal the full outline; click the 📌 icon in the header to **pin the outline panel open** so it stays visible while browsing; click again or use the shortcut to unpin
-- **Global keyboard shortcut**: press `Cmd/Ctrl + Shift + O` anytime to toggle or pin/unpin the table-of-contents overlay
-- **Outline search**: the expanded outline has a search box that filters messages by summary/key in real time (case-insensitive), making it easy to find and jump to historical messages
-- **Message bookmarks**: hover any outline entry and tap the star (⭐) to bookmark key messages (e.g. conclusions, API contracts); the outline header has a one-click "starred only" filter; bookmarks persist in browser localStorage across reloads
-- **Export / Copy Markdown Outline**: the outline header provides a "📋 Copy outline" button to extract the entire conversation outline into a formatted Markdown tree in one click
-- **Click to jump**: click any entry to smooth-scroll to the corresponding message
-- **Multilingual**: follows the DSH Web UI language (Chinese / English); Spanish browsers automatically get Spanish copy; defaults to Simplified Chinese
-- Light / dark theme follows the DSH Web GUI; coexists with dsh-git-panel, positions follow automatically
+- **Native Fusion & Zero Redundancy**: Seamlessly enhances the native DSH Turn Rail without generating a second redundant track, keeping the UI 100% clean and elegant.
+- **Global Keyboard Shortcut**: Press `Cmd/Ctrl + Shift + O` anytime to toggle or pin/unpin the table-of-contents overlay, or click the subtle outline button at the top of the rail.
+- **Smart Heading Extraction**: Prioritizes Markdown headings (`##`) and key takeaway bold points as outline entries, keeping long technical threads and multi-step tasks organized without clutter.
+- **Pin Overlay Open**: Click the pin button in the header to lock the outline open on the right side while reviewing code or conversation.
+- **Search & Quick Jump**: Full real-time search box at the top of the outline to filter messages by keyword and smooth-scroll to them instantly.
+- **Message Bookmarks (⭐)**: Star key conclusions, plans, and API contracts for quick access; includes a "Starred only" toggle.
+- **Export / Copy Markdown Outline**: One-click button to export the entire conversation hierarchy as formatted Markdown.
+- **Automatic Session Sync**: Completely synchronized with DSH session navigation; automatically resets on fresh conversations.
+- **Multilingual**: Auto-syncs with DSH Web GUI language (Chinese / English / Spanish).
+- Light / dark theme follows DSH Web GUI.
 
 ## Screenshots
 
