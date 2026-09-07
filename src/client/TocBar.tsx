@@ -252,6 +252,7 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
   const [query, setQuery] = useState('')
   const [copied, setCopied] = useState(false)
   const [starOnly, setStarOnly] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'code' | 'tool'>('all')
 
   const [starred, setStarred] = useState<Set<string>>(() => {
     try {
@@ -341,12 +342,17 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     if (starOnly) {
       list = list.filter((it) => starred.has(it.key))
     }
+    if (typeFilter === 'code') {
+      list = list.filter((it) => it.tag === 'code' || (it.preview && /```|function|import|class|const|let|var|def\s/i.test(it.preview)))
+    } else if (typeFilter === 'tool') {
+      list = list.filter((it) => it.tag === 'tool' || (it.preview && /\[tool|工具调用|tool call/i.test(it.preview)))
+    }
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       list = list.filter((it) => it.text.toLowerCase().includes(q) || (it.preview ?? '').toLowerCase().includes(q))
     }
     return list
-  }, [items, starOnly, query, starred])
+  }, [items, starOnly, typeFilter, query, starred])
 
   const jumpTo = useCallback((item: TocItem) => {
     if (!pinned) setOpen(false)
@@ -440,6 +446,57 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+
+          <div style={{ display: 'flex', gap: '6px', padding: '0 12px 8px 12px', fontSize: '11px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setTypeFilter('all')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                background: typeFilter === 'all' ? 'var(--toc-accent, #3b82f6)' : 'var(--toc-hover, rgba(128,128,128,0.15))',
+                color: typeFilter === 'all' ? '#ffffff' : 'var(--toc-muted, #6e7781)',
+                fontWeight: typeFilter === 'all' ? 600 : 400,
+                transition: 'all 0.1s ease',
+              }}
+            >
+              {t('toc.filter.all')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTypeFilter('code')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                background: typeFilter === 'code' ? 'var(--toc-accent, #3b82f6)' : 'var(--toc-hover, rgba(128,128,128,0.15))',
+                color: typeFilter === 'code' ? '#ffffff' : 'var(--toc-muted, #6e7781)',
+                fontWeight: typeFilter === 'code' ? 600 : 400,
+                transition: 'all 0.1s ease',
+              }}
+            >
+              {t('toc.filter.code')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTypeFilter('tool')}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                background: typeFilter === 'tool' ? 'var(--toc-accent, #3b82f6)' : 'var(--toc-hover, rgba(128,128,128,0.15))',
+                color: typeFilter === 'tool' ? '#ffffff' : 'var(--toc-muted, #6e7781)',
+                fontWeight: typeFilter === 'tool' ? 600 : 400,
+                transition: 'all 0.1s ease',
+              }}
+            >
+              {t('toc.filter.tool')}
+            </button>
+          </div>
 
           <div className="dsh-toc-scroll">
             {filtered.length === 0 ? (

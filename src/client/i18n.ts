@@ -26,6 +26,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.pin': '固定展开',
     'toc.unpin': '解除固定',
     'toc.shortcut': '快捷键：Cmd/Ctrl + Shift + O',
+    'toc.filter.all': '全部',
+    'toc.filter.code': '仅代码 💻',
+    'toc.filter.tool': '仅工具 ⚙️',
   },
   en: {
     'toc.title': 'Table of contents',
@@ -42,6 +45,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.pin': 'Pin open',
     'toc.unpin': 'Unpin',
     'toc.shortcut': 'Shortcut: Cmd/Ctrl + Shift + O',
+    'toc.filter.all': 'All',
+    'toc.filter.code': 'Code 💻',
+    'toc.filter.tool': 'Tools ⚙️',
   },
   es: {
     'toc.title': 'Índice de la conversación',
@@ -58,6 +64,9 @@ const DICTS: Record<Lang, Dict> = {
     'toc.pin': 'Fijar panel',
     'toc.unpin': 'Desfijar panel',
     'toc.shortcut': 'Atajo: Cmd/Ctrl + Shift + O',
+    'toc.filter.all': 'Todos',
+    'toc.filter.code': 'Código 💻',
+    'toc.filter.tool': 'Herramientas ⚙️',
   },
 }
 

@@ -22,6 +22,7 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
 - **Inline Native Top Toolbar**:
   - Embedded right beside the "Session Logs" action button in the native top bar; avoids sidebar collisions and never causes dual body scrollbars.
   - **🔍 Quick Query Search**: Expands an inline search bar smoothly to the left; matches glow blue on the rail and smooth-scroll to the target turn immediately; press `Esc` to collapse.
+  - **💻 Code & Tools Filter Capsules**: Quick filter pills (`All` · `Code 💻` · `Tools ⚙️`) below the search bar to isolate turns with code blocks or tool calls in long conversations.
   - **⭐ Starred-Only Filter**: Turns unstarred marks into subtle 8% opacities, while starred marks illuminate into **22px elongated golden lines with ambient particle glows**.
   - **📋 Export Markdown Outline**: One-click button to extract the entire conversation turn hierarchy as formatted Markdown.
 
