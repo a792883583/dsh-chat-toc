@@ -542,13 +542,64 @@ export function apply(ctx: ClientContext): void {
         const searchInput = document.createElement('input')
         searchInput.className = 'dsh-top-search-input'
         searchInput.placeholder = '搜索本页...'
-        searchInput.onkeydown = (e) => {
+        // 深度搜索状态与历史回溯加载控制器
+        let deepSearching = false
+        const triggerLoadOlderIfNeeded = async (): Promise<boolean> => {
+          // 查找 DSH 官方聊天流顶部的「加载更早」按钮
+          const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+          const loadOlderBtn = buttons.find(
+            (b) =>
+              (b.textContent || '').includes('加载更早') ||
+              (b.textContent || '').includes('Load earlier') ||
+              (b.textContent || '').includes('Cargar anteriores'),
+          )
+          if (loadOlderBtn && !loadOlderBtn.disabled) {
+            loadOlderBtn.click()
+            // 等待 DOM 追加新轮次
+            await new Promise((resolve) => setTimeout(resolve, 600))
+            return true
+          }
+          return false
+        }
+
+        searchInput.onkeydown = async (e) => {
           if (e.key === 'Escape') {
             searchExpanded = false
             searchInput.classList.remove('expanded')
             searchBtn.classList.remove('active')
             searchQuery = ''
             updateRailMarks()
+          } else if (e.key === 'Enter' && searchQuery) {
+            // 按 Enter 键：若当前未搜到，主动深度向上拉取历史直到命中或拉完全部
+            if (deepSearching) return
+            deepSearching = true
+            searchInput.placeholder = '🔍 正在深度回溯历史对话…'
+
+            let found = false
+            let attempts = 0
+            while (attempts < 10) {
+              const rows = document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
+              for (const r of rows) {
+                if ((r.textContent || '').toLowerCase().includes(searchQuery)) {
+                  r.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  updateRailMarks()
+                  found = true
+                  break
+                }
+              }
+              if (found) break
+
+              // 尝试拉取更早历史
+              const hasMore = await triggerLoadOlderIfNeeded()
+              if (!hasMore) break
+              attempts++
+            }
+
+            searchInput.placeholder = found ? '搜索本页 (按 Enter 深度回溯)...' : '未在历史对话中找到匹配项'
+            deepSearching = false
+            setTimeout(() => {
+              searchInput.placeholder = '搜索本页 (按 Enter 深度回溯)...'
+            }, 3000)
           }
         }
         searchInput.oninput = () => {

@@ -21,7 +21,7 @@ Un plugin de navegación y mejora de índice para la GUI web de DSH: **potencia 
 
 - **Barra de Herramientas en Línea (Layout Nativo)**:
   - Integrada justo al lado del botón "Session 日志" en la barra superior nativa; evita colisiones con paneles laterales y previene barras de desplazamiento no deseadas.
-  - **🔍 Búsqueda Rápida**: Despliega un cuadro de búsqueda hacia la izquierda; las coincidencias brillan en azul en el riel y se desplazan automáticamente a la posición; pulse `Esc` para cerrarlo.
+  - **🔍 Búsqueda Instantánea y Profunda**: Resaltado difuso en la vista actual; **en conversaciones largas, presione Enter para Búsqueda Profunda**, cargando automáticamente mensajes antiguos mediante "Cargar anteriores" hasta encontrar y desplazar hacia el objetivo.
   - **💻 Cápsulas de Filtro de Código y Herramientas**: Filtros rápidos (`Todos` · `Código 💻` · `Herramientas ⚙️`) bajo el buscador para localizar al instante turnos con bloques de código o llamadas a herramientas.
   - **⭐ Filtro de Destacados**: Atenúa las marcas no destacadas al 8%, mientras que las destacadas brillan como **líneas doradas de 22px con efecto resplandeciente**.
   - **📋 Exportar Esquema Markdown**: Copia en un clic toda la estructura de la conversación en formato Markdown.
