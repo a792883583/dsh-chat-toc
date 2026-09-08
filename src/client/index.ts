@@ -649,6 +649,33 @@ export function apply(ctx: ClientContext): void {
         }
         capsule.appendChild(starBtn)
 
+        // 💻 仅看代码块 / 工具
+        let codeOnly = false
+        const codeBtn = document.createElement('button')
+        codeBtn.className = 'dsh-top-btn'
+        codeBtn.title = '仅高亮包含代码/工具调用的轮次'
+        codeBtn.innerHTML = `
+          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="5 4 1 8 5 12"/>
+            <polyline points="11 4 15 8 11 12"/>
+            <line x1="9.5" y1="3" x2="6.5" y2="13"/>
+          </svg>
+        `
+        codeBtn.onclick = (e) => {
+          e.stopPropagation()
+          codeOnly = !codeOnly
+          codeBtn.classList.toggle('active', codeOnly)
+          if (codeOnly) {
+            codeBtn.style.color = 'var(--toc-accent, #3b82f6)'
+            searchQuery = '```'
+          } else {
+            codeBtn.style.color = ''
+            searchQuery = ''
+          }
+          updateRailMarks()
+        }
+        capsule.appendChild(codeBtn)
+
         // 📋 导出 Markdown 大纲
         const exportBtn = document.createElement('button')
         exportBtn.className = 'dsh-top-btn'
