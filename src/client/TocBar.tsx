@@ -50,17 +50,16 @@ html.dark .dsh-toc-wrap {
 }
 .dsh-toc-wrap * { box-sizing: border-box; }
 
-/* 浮动常驻触发按钮：优雅停靠在右侧折叠小按钮上方 */
+/* 顶栏常驻触发按钮：优雅停靠在右上角更多菜单左侧 */
 .dsh-toc-launcher {
   position: fixed;
   pointer-events: auto;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--toc-bg);
   border: 1px solid var(--toc-border);
   color: var(--toc-muted);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,17 +70,30 @@ html.dark .dsh-toc-wrap {
 .dsh-toc-launcher:hover, .dsh-toc-launcher.open {
   color: var(--toc-accent);
   border-color: var(--toc-accent);
-  background: var(--toc-bg);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  background: var(--toc-hover);
 }
 
-/* 弹出的大纲侧边抽屉面板 */
+/* 弹出的大纲侧边抽屉面板：从右上角平滑下弹 */
 .dsh-toc-drawer {
   position: fixed;
   pointer-events: auto;
-  width: 330px;
+  width: 360px;
   max-height: 80vh;
   background: var(--toc-bg);
+  border: 1px solid var(--toc-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  animation: dshTocSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1001;
+}
+  display: flex;
+  flex-direction: column;
+  animation: dshTocSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1001;
+}
   border: 1px solid var(--toc-border);
   border-radius: 12px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
@@ -275,6 +287,58 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     })
   }, [])
 
+  const [deepSearching, setDeepSearching] = useState(false)
+  const [searchPlaceholder, setSearchPlaceholder] = useState('')
+
+  const triggerLoadOlderIfNeeded = async (): Promise<boolean> => {
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+    const loadOlderBtn = buttons.find(
+      (b) =>
+        (b.textContent || '').includes('加载更早') ||
+        (b.textContent || '').includes('Load earlier') ||
+        (b.textContent || '').includes('Cargar anteriores'),
+    )
+    if (loadOlderBtn && !loadOlderBtn.disabled) {
+      loadOlderBtn.click()
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      return true
+    }
+    return false
+  }
+
+  const handleSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setQuery('')
+    } else if (e.key === 'Enter' && query.trim()) {
+      if (deepSearching) return
+      setDeepSearching(true)
+      setSearchPlaceholder('🔍 正在深度回溯历史对话…')
+      const target = query.trim().toLowerCase()
+
+      let found = false
+      let attempts = 0
+      while (attempts < 12) {
+        const rows = document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
+        for (const r of rows) {
+          if ((r.textContent || '').toLowerCase().includes(target)) {
+            r.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            found = true
+            break
+          }
+        }
+        if (found) break
+
+        const hasMore = await triggerLoadOlderIfNeeded()
+        if (!hasMore) break
+        attempts++
+      }
+
+      setSearchPlaceholder(found ? '已定位到匹配项' : '未在历史记录中找到匹配项')
+      setDeepSearching(false)
+      setTimeout(() => setSearchPlaceholder(''), 3000)
+    }
+  }
+
   const exportMarkdown = useCallback(() => {
     if (items.length === 0) return
     const lines = items.map((item, idx) => {
@@ -305,32 +369,25 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
     return () => window.removeEventListener('keydown', onKey)
   }, [open, pinned])
 
-  // 定位计算：检测官方折叠箭头按钮或轨道，紧邻其左上方停靠
+  // 定位计算：挂载在右上角操作栏区（紧邻 ··· 按钮的左侧或顶部右侧）
   useEffect(() => {
     const measure = () => {
-      const toggle = document.querySelector<HTMLElement>('button[aria-label*="collapse" i], button[aria-label*="折叠" i], [class*="collapseBtn"]')
-      if (toggle !== null) {
-        const r = toggle.getBoundingClientRect()
+      // 查找右上角的更多按钮 (···)
+      const moreBtn = document.querySelector<HTMLElement>('button[aria-label*="more" i], button[aria-label*="更多" i], [class*="more"]') ||
+                      Array.from(document.querySelectorAll<HTMLElement>('button')).find(b => b.textContent?.trim() === '···')
+      if (moreBtn) {
+        const r = moreBtn.getBoundingClientRect()
         setPos({
-          right: Math.max(8, window.innerWidth - r.right),
-          top: Math.max(40, r.top - 36),
+          right: Math.max(12, window.innerWidth - r.left + 8),
+          top: Math.max(8, r.top),
         })
       } else {
-        const rail = document.querySelector<HTMLElement>('[class*="rail"], [class*="_frame"]')
-        if (rail !== null) {
-          const r = rail.getBoundingClientRect()
-          setPos({
-            right: Math.max(8, window.innerWidth - r.right),
-            top: Math.max(40, r.top - 36),
-          })
-        } else {
-          setPos({ right: 12, top: 260 })
-        }
+        setPos({ right: 90, top: 12 })
       }
     }
     measure()
     window.addEventListener('resize', measure)
-    const interval = window.setInterval(measure, 1000)
+    const interval = window.setInterval(measure, 600)
     return () => {
       window.removeEventListener('resize', measure)
       window.clearInterval(interval)
@@ -376,7 +433,7 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
 
       {/* 点击弹出的完整大纲抽屉 */}
       {open ? (
-        <div className="dsh-toc-drawer" style={{ right: pos.right + 34, top: Math.max(30, pos.top - 120) }}>
+        <div className="dsh-toc-drawer" style={{ right: pos.right, top: pos.top + 38 }}>
           <div className="dsh-toc-header">
             <span className="dsh-toc-heading">
               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -442,9 +499,10 @@ export function TocBar(props: { scrollEl: HTMLElement; items: TocItem[] }): Reac
           <input
             type="text"
             className="dsh-toc-input"
-            placeholder={t('toc.search')}
+            placeholder={searchPlaceholder || '搜索会话内容 (按 Enter 深度回溯历史)...'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
           />
 
           <div style={{ display: 'flex', gap: '6px', padding: '0 12px 8px 12px', fontSize: '11px', flexWrap: 'wrap' }}>

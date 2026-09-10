@@ -513,25 +513,45 @@ export function apply(ctx: ClientContext): void {
     }
     window.addEventListener('mousemove', onMouseMove, { passive: true })
 
-    // 4. 插入在 Session 日志 按钮左侧的常规流工具条（绝不死锁、绝不撑破 body）
+    // 4. 方案 A：在聊天窗口右上角顶栏（模型选择器与 ··· 之间）常驻精致操作胶囊
     const syncTopCapsule = () => {
-      // 查找包含 Session 日志 的按钮
+      // 严禁注入到左侧边栏、弹窗、下拉菜单中
       const allButtons = Array.from(document.querySelectorAll<HTMLElement>('button'))
-      const logBtn = allButtons.find((b) => (b.textContent || '').includes('Session 日志') || (b.textContent || '').includes('Session') && (b.textContent || '').includes('日志'))
       
-      if (!logBtn || !logBtn.parentElement) {
-        return
-      }
+      // 过滤出真正位于主聊天区顶部（header/main）的操作按钮
+      const topActionButtons = allButtons.filter((b) => {
+        // 排除左侧边栏与导航
+        if (b.closest('aside, nav, [class*="sidebar" i], [class*="drawer" i]')) return false
+        // 排除弹窗、下拉菜单、Popover
+        if (b.closest('[role="menu"], [class*="popover" i], [class*="menu" i], [class*="dropdown" i]')) return false
+        
+        // 按钮必须位于视口上方区域（例如 top < 80px）
+        const rect = b.getBoundingClientRect()
+        if (rect.top > 80 || rect.right < window.innerWidth / 2) return false
+        return true
+      })
+
+      // 在右上角顶部按钮中，找到 ··· 按钮
+      const moreBtn = topActionButtons.find((b) => {
+        const text = b.textContent?.trim() || ''
+        return text === '···' || b.getAttribute('aria-label')?.toLowerCase().includes('more') || b.className.toLowerCase().includes('more')
+      })
+
+      // 如果找不到 ···，找右上角其他操作按钮（如包含 svg/图标的顶栏按钮）
+      const anchorBtn = moreBtn || topActionButtons[topActionButtons.length - 1]
+      if (!anchorBtn || !anchorBtn.parentElement) return
+
+      const container = anchorBtn.parentElement
 
       let capsule = document.querySelector<HTMLElement>('.dsh-top-capsule')
       if (capsule === null) {
         capsule = document.createElement('div')
         capsule.className = 'dsh-top-capsule'
 
-        // 🔍 搜索
+        // 🔍 搜索按钮
         const searchBtn = document.createElement('button')
         searchBtn.className = 'dsh-top-btn'
-        searchBtn.title = '搜索对话轮次'
+        searchBtn.title = '搜索会话内容 (按 Enter 深度回溯历史)'
         searchBtn.innerHTML = `
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="7" cy="7" r="4.5"/>
@@ -542,12 +562,11 @@ export function apply(ctx: ClientContext): void {
         const searchInput = document.createElement('input')
         searchInput.className = 'dsh-top-search-input'
         searchInput.placeholder = '搜索本页...'
-        // 深度搜索状态与历史回溯加载控制器
+
         let deepSearching = false
-        const triggerLoadOlderIfNeeded = async (): Promise<boolean> => {
-          // 查找 DSH 官方聊天流顶部的「加载更早」按钮
-          const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
-          const loadOlderBtn = buttons.find(
+        const triggerLoadOlder = async (): Promise<boolean> => {
+          const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+          const loadOlderBtn = btns.find(
             (b) =>
               (b.textContent || '').includes('加载更早') ||
               (b.textContent || '').includes('Load earlier') ||
@@ -555,7 +574,6 @@ export function apply(ctx: ClientContext): void {
           )
           if (loadOlderBtn && !loadOlderBtn.disabled) {
             loadOlderBtn.click()
-            // 等待 DOM 追加新轮次
             await new Promise((resolve) => setTimeout(resolve, 600))
             return true
           }
@@ -570,14 +588,13 @@ export function apply(ctx: ClientContext): void {
             searchQuery = ''
             updateRailMarks()
           } else if (e.key === 'Enter' && searchQuery) {
-            // 按 Enter 键：若当前未搜到，主动深度向上拉取历史直到命中或拉完全部
             if (deepSearching) return
             deepSearching = true
             searchInput.placeholder = '🔍 正在深度回溯历史对话…'
 
             let found = false
             let attempts = 0
-            while (attempts < 10) {
+            while (attempts < 12) {
               const rows = document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]')
               for (const r of rows) {
                 if ((r.textContent || '').toLowerCase().includes(searchQuery)) {
@@ -588,20 +605,19 @@ export function apply(ctx: ClientContext): void {
                 }
               }
               if (found) break
-
-              // 尝试拉取更早历史
-              const hasMore = await triggerLoadOlderIfNeeded()
+              const hasMore = await triggerLoadOlder()
               if (!hasMore) break
               attempts++
             }
 
-            searchInput.placeholder = found ? '搜索本页 (按 Enter 深度回溯)...' : '未在历史对话中找到匹配项'
+            searchInput.placeholder = found ? '已定位到匹配项' : '未在历史对话中找到'
             deepSearching = false
             setTimeout(() => {
-              searchInput.placeholder = '搜索本页 (按 Enter 深度回溯)...'
+              searchInput.placeholder = '搜索本页...'
             }, 3000)
           }
         }
+
         searchInput.oninput = () => {
           searchQuery = searchInput.value.trim().toLowerCase()
           updateRailMarks()
@@ -631,7 +647,7 @@ export function apply(ctx: ClientContext): void {
         capsule.appendChild(searchBtn)
         capsule.appendChild(searchInput)
 
-        // ⭐ 收藏过滤
+        // ⭐ 收藏筛选
         const starBtn = document.createElement('button')
         starBtn.className = 'dsh-top-btn'
         starBtn.title = '仅高亮已收藏轮次'
@@ -649,7 +665,7 @@ export function apply(ctx: ClientContext): void {
         }
         capsule.appendChild(starBtn)
 
-        // 💻 仅看代码块 / 工具
+        // 💻 仅看代码块
         let codeOnly = false
         const codeBtn = document.createElement('button')
         codeBtn.className = 'dsh-top-btn'
@@ -676,7 +692,7 @@ export function apply(ctx: ClientContext): void {
         }
         capsule.appendChild(codeBtn)
 
-        // 📋 导出 Markdown 大纲
+        // 📋 复制大纲 Markdown
         const exportBtn = document.createElement('button')
         exportBtn.className = 'dsh-top-btn'
         exportBtn.title = '复制整场对话大纲为 Markdown'
@@ -705,11 +721,12 @@ export function apply(ctx: ClientContext): void {
         }
         capsule.appendChild(exportBtn)
 
-        // 插入到 Session 日志 按钮的前面！
-        logBtn.parentElement.insertBefore(capsule, logBtn)
+        // 插入到锚点按钮（···）前面，完美并排显示！
+        container.insertBefore(capsule, anchorBtn)
       }
     }
 
+    // 定时维护轨道标记与顶栏胶囊
     const timer = window.setInterval(() => {
       if (disposed) return
       syncTopCapsule()
