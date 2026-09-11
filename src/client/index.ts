@@ -21,8 +21,9 @@ interface ClientContext {
 export const inject = ['locale']
 
 const STYLE = `
-/* 1. 隐藏官方原生脆弱卡片 */
-[class*="_preview"] {
+/* 1. 隐藏官方原生 Turn Rail 悬停预览小卡片（精准限制作用域，严禁全局通配影响 sidebar document preview） */
+[class*="rail"] [class*="_preview"],
+[data-slot*="rail"] [class*="_preview"] {
   display: none !important;
 }
 
