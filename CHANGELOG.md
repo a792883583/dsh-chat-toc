@@ -2,6 +2,14 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.4.10] - 2026-09-12
+
+### Docs
+- **截图改用真实浏览器渲染**（Chrome headless，纯文档版本）：
+  - 上一版 0.4.9 的图由 GDI+ 程序化绘制；本次改用 Chrome 加载插件**真实 CSS 与图标 SVG** 渲染，字体、间距、圆角、阴影与真实 UI 完全一致；
+  - 图片内容仍为脱敏示例（通用分页问题），**不含任何真实对话或业务内容**；
+  - 过滤示意图中未收藏刻度不透明度由实际的 `0.08` 提高到 `0.18`，仅为让静态图里轨道结构可辨。
+- 记录一处排查经验：在 Windows 服务会话里**直接调用** `chrome`/`msedge` 并捕获 stdio 会静默无产出；改用 `Start-Process`（不接管 stdio）后即可正常渲染。
 ## [0.4.9] - 2026-09-12
 
 ### Docs

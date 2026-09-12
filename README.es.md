@@ -34,11 +34,11 @@ Un plugin de navegación y mejora de índice para la GUI web de DSH: **potencia 
 
 **1. Tarjeta Emergente (Pregunta + Respuesta de IA con acciones de Destacar/Copiar, y Barra Superior):**
 
-![Vista previa de tarjeta emergente](docs/toc-pop.png?v=0.4.9)
+![Vista previa de tarjeta emergente](docs/toc-pop.png?v=0.4.10)
 
 **2. Filtro de Destacados Activo (Marcas destacadas brillan en dorado y el resto se atenúa):**
 
-![Resaltado de marcas](docs/toc-bar.png?v=0.4.9)
+![Resaltado de marcas](docs/toc-bar.png?v=0.4.10)
 
 ## Requisitos
 
