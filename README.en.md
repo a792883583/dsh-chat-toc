@@ -40,6 +40,12 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
 
 ![Rail Marks Highlight](docs/toc-bar.png?v=0.4.3)
 
+## Requirements
+
+- **DSH Web** with the official Turn Rail navigation (shipped inside `@deepseek-ai/dsh-web-app`); verified on **`@deepseek-ai/dsh@0.1.5-rc.2`**.
+- **How it hooks in**: it locates the official rail by DOM **structure** — e.g. the `previewPrompt` node inside the official preview card — instead of fragile CSS-Module hashes, so it tolerates official minor upgrades far better.
+- **Dependencies**: a pure client-side enhancement. No other plugins, no host-side service, no extra configuration.
+
 ## Installation
 
 ```sh

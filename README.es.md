@@ -40,6 +40,12 @@ Un plugin de navegación y mejora de índice para la GUI web de DSH: **potencia 
 
 ![Resaltado de marcas](docs/toc-bar.png?v=0.4.3)
 
+## Requisitos
+
+- **DSH Web** con el Turn Rail oficial (incluido en `@deepseek-ai/dsh-web-app`); verificado en **`@deepseek-ai/dsh@0.1.5-rc.2`**.
+- **Cómo se integra**: localiza el riel oficial por la **estructura** del DOM — por ejemplo el nodo `previewPrompt` dentro de la tarjeta de vista previa oficial — en lugar de hashes de CSS Modules, por lo que tolera mucho mejor las actualizaciones menores.
+- **Dependencias**: una mejora puramente del lado del cliente. Sin otros plugins, sin servicio en el host y sin configuración adicional.
+
 ## Instalación
 
 ```sh

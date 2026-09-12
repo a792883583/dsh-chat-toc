@@ -2,6 +2,23 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.4.8] - 2026-09-12
+
+### Fixed
+- **修复「官方预览卡与插件卡片同屏显示两张」的回归**：
+  - 根因：0.4.7 为了不误伤右侧栏「文档预览」面板，把隐藏规则收窄成了
+    `[class*="rail"] [class*="_preview"]` / `[data-slot*="rail"] ...`。
+    但官方 turn rail 的 CSS Module 类名形如 `eGxaPq_frame` / `eGxaPq_preview`，
+    **完全不含 `rail` 字样**，且官方包内**不存在任何 `data-slot` 属性**，
+    导致该规则一个都匹配不到 —— 官方悬浮卡从未被隐藏，与插件卡片同屏。
+  - 修复：改用官方卡片的**结构特征**精确定位 ——
+    `[class*="_preview"]:has([class*="previewPrompt"])`。
+    官方预览卡内部必定包含 `previewPrompt` 子节点，因此该选择器
+    **既不受 CSS Module hash 变化影响，也绝不会误伤文档预览面板**。
+  - 另加一层**不依赖 `:has()` 的 JS 兜底**（同样按 `previewPrompt` 识别），
+    在不支持 `:has()` 的浏览器上也能正确隐藏官方卡片。
+  - 刻意保持单条选择器而非逗号列表：旧浏览器遇到无法解析的选择器会让整条规则失效。
+
 ## [0.4.6] - 2026-09-09
 
 ### Changed

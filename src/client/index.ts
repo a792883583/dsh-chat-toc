@@ -21,9 +21,14 @@ interface ClientContext {
 export const inject = ['locale']
 
 const STYLE = `
-/* 1. 隐藏官方原生 Turn Rail 悬停预览小卡片（精准限制作用域，严禁全局通配影响 sidebar document preview） */
-[class*="rail"] [class*="_preview"],
-[data-slot*="rail"] [class*="_preview"] {
+/* 1. 隐藏官方原生 Turn Rail 悬停预览小卡片。
+   识别方式：官方预览卡内部必定包含 previewPrompt 子节点（见 dsh-client-ui-chat 的
+   TurnNavigator），因此用 :has() 精确锁定它本体 ——
+     · 不受 CSS Module hash 变化影响（官方类名形如 eGxaPq_preview，不含 "rail" 字样）；
+     · 绝不误伤右侧栏的「文档预览」面板（那也是 *_preview 类名）。
+   注意：这里刻意保持「单条选择器」，不写含 :has() 的逗号列表 ——
+   旧浏览器遇到无法解析的选择器会让整条规则失效。 */
+[class*="_preview"]:has([class*="previewPrompt"]) {
   display: none !important;
 }
 
@@ -727,11 +732,25 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
+    /* 兜底：不依赖 :has() 的官方预览卡隐藏。
+       同样以 previewPrompt 子节点识别，因此只可能命中官方卡片本体 ——
+       既不会隐藏我们自己的卡片（它没有 previewPrompt），
+       也不会碰到右侧栏的「文档预览」面板（它没有 previewPrompt）。 */
+    const suppressOfficialPreview = () => {
+      const prompts = document.querySelectorAll<HTMLElement>('[class*="previewPrompt"]')
+      if (prompts.length === 0) return
+      for (const node of prompts) {
+        const card = node.closest<HTMLElement>('[class*="_preview"]')
+        if (card !== null && card.style.display !== 'none') card.style.display = 'none'
+      }
+    }
+
     // 定时维护轨道标记与顶栏胶囊
     const timer = window.setInterval(() => {
       if (disposed) return
       syncTopCapsule()
       updateRailMarks()
+      suppressOfficialPreview()
     }, 400)
 
     return () => {
