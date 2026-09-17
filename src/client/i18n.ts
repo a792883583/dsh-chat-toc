@@ -12,6 +12,8 @@ type Dict = Record<string, string>
 
 const DICTS: Record<Lang, Dict> = {
   zh: {
+    'card.notLoaded': '该轮对话尚未加载',
+    'card.notLoadedHint': '向下滚动或点击该刻度即可加载',
     'toc.title': '对话目录',
     'toc.empty': '暂无对话消息',
     'toc.search': '搜索消息…',
@@ -31,6 +33,8 @@ const DICTS: Record<Lang, Dict> = {
     'toc.filter.tool': '仅工具 ⚙️',
   },
   en: {
+    'card.notLoaded': 'This turn is not loaded yet',
+    'card.notLoadedHint': 'Scroll or click the mark to load it',
     'toc.title': 'Table of contents',
     'toc.empty': 'No messages yet',
     'toc.search': 'Search messages…',
@@ -50,6 +54,8 @@ const DICTS: Record<Lang, Dict> = {
     'toc.filter.tool': 'Tools ⚙️',
   },
   es: {
+    'card.notLoaded': 'Este turno aún no está cargado',
+    'card.notLoadedHint': 'Desplázate o haz clic en la marca para cargarlo',
     'toc.title': 'Índice de la conversación',
     'toc.empty': 'Aún no hay mensajes',
     'toc.search': 'Buscar mensajes…',
