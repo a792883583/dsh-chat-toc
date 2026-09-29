@@ -2,6 +2,55 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.5.0] - 2026-09-29
+
+### ⚠️ 最低版本要求
+
+本版**要求 DSH 宿主 ≥ `0.1.5-rc.2`**（`@deepseek-ai/dsh-client-runtime` / `dsh-client-locale`
+及 `dsh-client-ui-chat` ≥ `0.1.5-rc.2`），`peerDependencies` 已同步收紧为
+`>=0.1.5-rc.2 <0.3.0`。原因：本版依赖下列官方 DOM 契约，它们自 `0.1.5-rc.2` 起才齐备：
+
+| 依赖 | 用途 |
+| --- | --- |
+| `data-chat-flow-kind` / `data-chat-turn` / `data-chat-anchor-key` | 轮次与行的权威判据 |
+| `data-chat-flow-kind="text"` vs `"reasoning"` | 区分回答正文与思考过程 |
+| 刻度按钮 `aria-label` 内的轮次号（`chat.turnNavigation.jump`） | 刻度 → 轮次映射 |
+| `*_bubble` / `*_previewPrompt` / `*_previewResponse` | 提问文本与官方预览兜底 |
+
+同时**兼容 `0.2.0-rc.1`**：官方在该版删除了 `markPosition` 类名并将刻度改为虚拟化渲染，
+本版已改为以**刻度按钮自身**为锚点，新旧两代通用。
+
+### Fixed
+
+- **适配官方 `0.2.0-rc.1` 破坏性改版（悬停完全无反应）**：官方删除了 `markPosition` 类名
+  （改为 `div.marks > button.mark`）并将刻度改为**虚拟化渲染**。此前依赖 `markPosition`
+  的选择器在新版下恒为空，导致悬停刻度无任何反应。现以**刻度按钮自身**
+  `button[class*="_mark"][aria-label]` 为锚点，新旧两代通用；并因虚拟化改为每次重新读取，
+  绝不缓存刻度元素引用
+- **预览卡高频误触发**：命中判定曾用裸子串 `[class*="mark"]` / `[class*="frame"]`，会误命中
+  生态内的 `.markCatalogParentExpandable` / `.markDirty`（目录树）、`.marker` / `.yAWgPa_marker`
+  （消息标记）等小写类名，鼠标划过正文即弹卡。现一律要求下划线前缀 `_mark` / `_frame`
+- **最新消息被误报「尚未加载」**：轮次号曾用「刻度在容器中的顺序号」推算，但官方 turn 号
+  **并不保证从 1 连续**（历史分页 / 会话压缩会产生空洞），序号错位即把最新一轮判成未加载。
+  现以官方 `aria-label` 内的 `{turn}` 数字为唯一权威来源（该数字与界面语言无关）
+- **收藏最后一个节点却高亮别的节点**：`updateRailMarks` 的收藏/搜索高亮曾用
+  `candidates[i]`（刻度下标）取消息行，而**刻度数与用户消息行数并不一一对应**
+  （一轮可能产生多个刻度），下标必然错位。现统一改用轮次号绑定
+- **卡片抓到思考内容而非回答**：回复提取曾只判断「文本长度 > 15」，而官方把
+  `reasoning`（思考）也渲染为独立行，于是抓到英文思考过程。现改用官方
+  `data-chat-flow-kind` 精确筛选：只取 `text`（回答正文），跳过
+  `reasoning` / `tool-call` / `tool-result` / `turn-process` 等过程内容
+- **提问文本混入时间戳**：用户行（`*_userRow`）是 flex 纵向容器，除气泡外还含时间戳等旁支
+  元素。现优先取官方气泡 `*_bubble` 内文本
+- **卡片与工具条发灰 / 深色模式不协调**：预览卡曾用 `--dsw-alias-bg-overlay`（浅色为
+  `#e9ecf2`，明显偏灰）并额外写死深色覆盖 `#1f2937`。现**完全对齐官方原生预览卡**：
+  背景 `--dsw-alias-bg-layer-1`（浅色纯白）、阴影 `--dsw-elevation-panel`、
+  圆角 `--dsw-radius-lg`、副文 `--dsw-alias-label-caption`；顶层工具条改用
+  `--dsw-alias-bg-layer-2`。所有颜色一律走官方 token，不再硬编码，由主题自动适配
+- **移除已失效的官方标识符依赖**：`[class*="UserStyleBubble"]`（新版是组件函数名而非类名，
+  真实类名为 `Sixlwa_bubble`）与 `[class*="messageContent"]`（新版不存在）。
+  改用官方稳定数据属性 `data-chat-flow-kind === 'user'`
+
 ## [0.4.11] - 2026-09-16
 
 ### Fixed

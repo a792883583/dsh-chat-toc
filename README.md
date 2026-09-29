@@ -42,8 +42,15 @@ DSH Web GUI 的对话导航与大纲增强插件：**深度赋能官方原生 Tu
 
 ## 环境要求
 
-- **DSH Web**：需要带官方 **Turn Rail 导航轨** 的版本（官方 `@deepseek-ai/dsh-web-app` 自带）；已在 **`@deepseek-ai/dsh@0.1.5-rc.2`** 上实测通过。
-- **接入方式**：按 DOM **结构特征**定位官方轨道（例如官方预览卡内部的 `previewPrompt` 节点），**不依赖易变的 CSS Module 哈希**，因此对官方小版本升级有较好的韧性。
+- **最低版本要求：DSH 宿主 ≥ `0.1.5-rc.2`**（`@deepseek-ai/dsh-client-runtime` / `dsh-client-locale` / `dsh-client-ui-chat` ≥ `0.1.5-rc.2`）。`peerDependencies` 已声明为 `>=0.1.5-rc.2 <0.3.0`。
+  本插件依赖以下官方 DOM 契约，它们自 `0.1.5-rc.2` 起才齐备：
+  - `data-chat-flow-kind` / `data-chat-turn` / `data-chat-anchor-key`（轮次与消息行的权威判据）
+  - `data-chat-flow-kind="text"` 与 `"reasoning"` 的区分（用于只取**回答正文**、跳过思考过程）
+  - 刻度按钮 `aria-label` 内的轮次号（`chat.turnNavigation.jump`）
+  - `*_bubble` / `*_previewPrompt` / `*_previewResponse`（提问文本与官方预览兜底）
+- **已验证版本**：`0.1.5-rc.2`、`0.1.6-alpha.1/2`、**`0.2.0-rc.1`**（当前最新）。
+- **兼容官方 `0.2.0-rc.1` 的破坏性改版**：官方在该版**删除了 `markPosition` 类名**并把刻度改为**虚拟化渲染**。本插件已改为以**刻度按钮自身**为锚点，新旧两代通用；并因虚拟化改为每次重新读取，绝不缓存刻度元素引用。
+- **接入方式**：以官方**数据属性**（`data-chat-*`）与 `aria-label` 为主要判据，**不依赖易变的 CSS Module 哈希**；仅在确有必要时使用「哈希前缀 + 下划线」形式的类名子串。
 - **依赖**：纯前端增强，**无需任何其它插件**，无宿主侧服务，无需额外配置。
 
 ## 安装方式

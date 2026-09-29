@@ -20,6 +20,48 @@ interface ClientContext {
 
 export const inject = ['locale', 'remote', 'remote.session', 'sessions']
 
+/**
+ * 官方 Turn Rail 的刻度选择器（需同时兼容新旧两代官方实现）。
+ *
+ * ⚠️ 官方在 `dsh-client-ui-chat@0.2.0-rc.1` 做了**破坏性改版**：
+ *   · **删除了 `markPosition` 类名** —— 旧版的 `div.markPosition > button.mark`
+ *     结构不复存在，新版是 `div.marks > button.mark`（刻度按钮自身绝对定位）；
+ *   · 刻度改为**虚拟化渲染**（`virtualizer`，只渲染可见项，滚动时复用）。
+ * 因此任何依赖 `markPosition` 的选择器在新版下**恒为空**（曾导致悬停完全无反应）。
+ *
+ * 现在的判定锚点是**刻度按钮自身**：`button[aria-label]`，它在两代里都存在，
+ * 且新版额外带 `data-index`（虚拟列表下标）。
+ *
+ * ⚠️ 另一个历史踩坑：更早用过裸子串 `[class*="mark"]` / `[class*="frame"]`，
+ * 命中面极大 —— 生态内 `.markCatalogParentExpandable` / `.markDirty`（目录树）、
+ * `.marker` / `.yAWgPa_marker`（消息标记）等小写类名都会被误命中，
+ * 导致鼠标划过正文就疯狂弹卡片。故一律要求**下划线前缀** `_mark` / `_frame`。
+ */
+const SEL_MARK_BUTTON = 'button[class*="_mark"][aria-label]'
+/** 官方轨道外框。 */
+const SEL_FRAME = '[class*="_frame"]'
+/** 官方用于标记「该轮尚未加载」的类名（加在刻度按钮自身）。 */
+const SEL_MARK_UNLOADED = '[class*="_markUnloaded"]'
+
+/**
+ * 从官方刻度的 `aria-label` 解析轮次号。
+ *
+ * 官方源码（TurnNavigator）：`aria-label = t("chat.turnNavigation.jump" | "…jumpLoad", { turn })`，
+ * 文案本身会本地化，但 **`{turn}` 永远是阿拉伯数字**，因此用「取末尾数字」的方式解析
+ * 与界面语言无关（中文「跳转到第 381 轮」/ 英文 "Jump to turn 381" 都能取到 381）。
+ *
+ * ⚠️ 历史踩坑：此前误判「aria-label 是本地化文案不可靠」，改用「刻度在容器中的序号」
+ * 当轮次号 —— 但官方 items 的 turn 号**并不保证从 1 连续**（历史分页、会话压缩后会出现
+ * 空洞），序号一旦错位就会把**最新的一轮**判成「尚未加载」，表现为明明刚发的消息
+ * 却提示未加载。故此处以官方 aria-label 为唯一权威来源。
+ */
+function turnFromAriaLabel(el: HTMLElement | null): number {
+  if (el === null) return 0
+  const label = el.getAttribute('aria-label') ?? ''
+  const m = label.match(/(\d+)(?!.*\d)/)
+  return m === null ? 0 : Number(m[1])
+}
+
 const STYLE = `
 /* 1. 隐藏官方原生 Turn Rail 悬停预览小卡片。
    识别方式：官方预览卡内部必定包含 previewPrompt 子节点（见 dsh-client-ui-chat 的
@@ -32,20 +74,25 @@ const STYLE = `
   display: none !important;
 }
 
-/* 2. 精美自主悬停卡片 */
+/* 2. 悬停预览卡片。
+   样式**对齐官方原生轨道预览卡**（TurnNavigator 的 *_preview），保证与官方观感一致：
+     · 背景 --dsw-alias-bg-layer-1（浅色纯白 #fff / 深色随主题）
+     · 阴影 --dsw-elevation-panel、圆角 --dsw-radius-lg
+     · 正文 --dsw-alias-label-primary、副文 --dsw-alias-label-caption
+   注意：此前用过 --dsw-alias-bg-overlay（浅色是 #e9ecf2，明显偏灰），
+   并额外写了写死的深色覆盖 #1f2937 —— 两者都与官方不一致，已移除。
+   所有颜色一律走官方 token，不再硬编码，由主题自动适配。 */
 .dsh-enhanced-preview-card {
   position: fixed;
   z-index: 1000;
+  box-sizing: border-box;
   width: 300px;
-  background: var(--dsw-alias-surface-overlay, #ffffff);
-  border: 1px solid var(--dsw-alias-border-l4, rgba(128, 128, 128, 0.22));
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  border: 0;
+  border-radius: var(--dsw-radius-lg, 10px);
+  box-shadow: var(--dsw-elevation-panel, 0 8px 24px rgba(0, 0, 0, 0.12));
   padding: 10px 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--dsw-alias-label-primary, #24292f);
-  font-size: 12px;
-  line-height: 1.45;
   pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.15s ease;
   transform: translateY(-50%);
@@ -56,19 +103,14 @@ const STYLE = `
   to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
-[data-ds-dark-theme] .dsh-enhanced-preview-card,
-[data-theme="dark"] .dsh-enhanced-preview-card,
-html.dark .dsh-enhanced-preview-card {
-  background: #1f2937;
-  color: #f3f4f6;
-  border-color: rgba(255, 255, 255, 0.12);
-}
+/* 深色适配交由官方 token 完成（bg-layer-1 / label-primary 会随 body[data-ds-dark-theme]
+   自动切换），因此不再需要写死的深色覆盖规则。 */
 
 .dsh-enhanced-preview-prompt {
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--dsw-alias-label-primary, currentColor);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -77,8 +119,8 @@ html.dark .dsh-enhanced-preview-card {
   word-break: break-all;
 }
 .dsh-enhanced-preview-response {
-  font-size: 11.5px;
-  color: var(--dsw-alias-label-secondary, #6e7781);
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption, var(--dsw-alias-label-secondary, #6e7781));
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -127,25 +169,21 @@ html.dark .dsh-enhanced-preview-response {
   font-weight: 600;
 }
 
-/* 3. 紧邻 Session 日志按钮排列的轻量工具条：100% 消除双滚动条与错位 */
+/* 3. 紧邻 Session 日志按钮排列的轻量工具条：100% 消除双滚动条与错位。
+   背景走官方浮层 token（bg-layer-2：浅色纯白 / 深色自动切换），
+   不再用偏灰的 bg-overlay，也不再写死深色覆盖 —— 由主题自动适配。 */
 .dsh-top-capsule {
   display: inline-flex;
   align-items: center;
-  background: var(--dsw-alias-surface-overlay, #ffffff);
-  border: 1px solid rgba(128, 128, 128, 0.22);
-  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2, #ffffff);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(128, 128, 128, 0.22));
+  border-radius: var(--dsw-radius-lg, 8px);
   box-shadow: none !important;
   padding: 2px 4px;
   margin-right: 8px;
   vertical-align: middle;
   pointer-events: auto;
   white-space: nowrap;
-}
-[data-ds-dark-theme] .dsh-top-capsule,
-[data-theme="dark"] .dsh-top-capsule,
-html.dark .dsh-top-capsule {
-  background: #1f2937;
-  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .dsh-top-btn {
@@ -196,10 +234,11 @@ html.dark .dsh-top-btn:hover {
   padding: 2px 4px;
 }
 
-/* 搜索匹配节点：加长发光 */
+/* 搜索匹配节点：加长发光。
+   注：高亮类直接加在刻度按钮自身（新旧两代通用）；旧版曾需要
+   以 _markPosition 作祖先的后代写法，新版已无该包裹层。 */
 .dsh-mark-matched:before,
-.dsh-mark-matched [class*="mark"]:before,
-[class*="markPosition"].dsh-mark-matched [class*="mark"]:before {
+.dsh-mark-matched [class*="_mark"]:before {
   background: #2563eb !important;
   box-shadow: 0 0 8px #2563eb !important;
   width: 22px !important;
@@ -208,12 +247,9 @@ html.dark .dsh-top-btn:hover {
 
 /* 已收藏的 mark 黄金高亮 */
 .dsh-mark-starred:before,
-.dsh-mark-starred [class*="mark"]:before,
-[class*="mark"].dsh-mark-starred:before,
-[class*="markPosition"].dsh-mark-starred [class*="mark"]:before,
+.dsh-mark-starred [class*="_mark"]:before,
 .dsh-filter-starred .dsh-mark-starred:before,
-.dsh-filter-starred .dsh-mark-starred [class*="mark"]:before,
-.dsh-filter-starred [class*="markPosition"].dsh-mark-starred [class*="mark"]:before {
+.dsh-filter-starred .dsh-mark-starred [class*="_mark"]:before {
   background: #eab308 !important;
   box-shadow: 0 0 10px rgba(234, 179, 8, 0.95) !important;
   width: 22px !important;
@@ -221,8 +257,7 @@ html.dark .dsh-top-btn:hover {
 }
 
 /* 过滤模式下，未收藏线条淡化 */
-.dsh-filter-starred [class*="markPosition"]:not(.dsh-mark-starred) [class*="mark"]:before,
-.dsh-filter-starred [class*="mark"]:not(.dsh-mark-starred):before {
+.dsh-filter-starred [class*="_mark"]:not(.dsh-mark-starred):before {
   opacity: 0.08 !important;
 }
 `
@@ -592,7 +627,7 @@ export function apply(ctx: ClientContext): void {
     }
 
     const updateRailMarks = () => {
-      const rail = document.querySelector<HTMLElement>('[class*="frame"], [class*="_frame"]')
+      const rail = document.querySelector<HTMLElement>(SEL_FRAME)
       if (!rail) return
 
       if (starOnly) {
@@ -602,10 +637,11 @@ export function apply(ctx: ClientContext): void {
       }
 
       const starred = getStarredKeys()
-      const markItems = Array.from(rail.querySelectorAll<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]'))
+      // 锚点为刻度按钮自身（新旧两代通用；新版已无 markPosition 包裹层且虚拟化）。
+      const markItems = Array.from(rail.querySelectorAll<HTMLElement>(SEL_MARK_BUTTON))
       const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
 
-      const promptRows = rows.filter((r) => r.dataset.chatFlowKind === 'user' || r.querySelector('[class*="UserStyleBubble"]'))
+      const promptRows = rows.filter((r) => r.dataset.chatFlowKind === 'user')
       const candidates = promptRows.length > 0 ? promptRows : rows
 
       /**
@@ -614,34 +650,49 @@ export function apply(ctx: ClientContext): void {
        * 官方在同一份 DOM 上已经提供了权威的轮次信息，直接使用即可，不需要任何
        * 几何推算（实测刻度的 getBoundingClientRect 恒为 0，且滚动发生在内部
        * 容器而非 window，所以基于坐标的方案必然失败）：
-       *   · 刻度按钮：aria-label="Jump to turn N" / "Load and jump to turn N"
+       *   · 刻度按钮：aria-label 形如 "Jump to turn N" / "跳转到第 N 轮"（**含数字 N**）
        *   · 消息行：  data-chat-turn="N"（同时带 data-chat-flow-kind="user" 等）
        *
-       * 因此绑定 = 刻度 turn N → 该 turn 的用户行。同一轮的多个中间刻度会落到
-       * 同一轮（语义正确），不同轮必然不同，且与滚动位置完全无关。
+       * ⚠️ 历史踩坑：这里曾用「刻度在容器中的顺序号」当轮次号，理由是"aria-label 是
+       * 本地化文案不可靠"。**这是错的**：本地化只影响模板文字，`{turn}` 始终是数字；
+       * 而官方 items 的 turn 号**并不保证从 1 连续**（历史分页、会话压缩会产生空洞），
+       * 序号一旦错位就会把**最新一轮**判成"尚未加载"。故一律以 aria-label 为准。
+       *
+       * ⚠️ 新版刻度**虚拟化**：DOM 里只有可见的那部分刻度，且滚动时元素被复用。
+       * 因此这里每次调用都重新全量读取，绝不缓存刻度元素引用。
        */
       const userRowsByTurn = new Map<string, HTMLElement>()
       for (const row of candidates) {
         const turn = row.dataset.chatTurn
         if (turn !== undefined && turn !== '' && !userRowsByTurn.has(turn)) userRowsByTurn.set(turn, row)
       }
-      // 轮次号一律取「刻度在容器中的顺序号」（1 基），**绝不解析 aria-label**：
-      // 那是本地化文案（英文 Jump to turn N / 中文 跳转到第 N 轮 / 西语 …），
-      // 一旦按文案解析，用户切换界面语言就会失效。
-      markItems.forEach((markEl, i) => {
-        const row = userRowsByTurn.get(String(i + 1))
-        if (row !== undefined) markEl.dataset.dshBoundKey = row.dataset.chatAnchorKey || ''
-        else delete markEl.dataset.dshBoundKey
+      markItems.forEach((markBtn) => {
+        const turnNum = turnFromAriaLabel(markBtn)
+        const row = turnNum > 0 ? userRowsByTurn.get(String(turnNum)) : undefined
+        if (row !== undefined) markBtn.dataset.dshBoundKey = row.dataset.chatAnchorKey || ''
+        else delete markBtn.dataset.dshBoundKey
       })
 
-      markItems.forEach((markEl, i) => {
+      /* 收藏 / 搜索高亮。
+       *
+       * ⚠️ 关键：这里必须用**轮次号**取对应消息行，**绝不能用刻度下标 `candidates[i]`**。
+       * 官方轨道刻度数与「用户消息行」数**并不一一对应** —— 一次提问可能产生多个刻度
+       * （工具调用、多段回复各占一个），下标一旦错位就会「收藏了 A 却高亮 B」
+       * （实测：收藏最后一个节点，高亮的却是别的节点）。
+       *
+       * 轮次号同样以官方 aria-label 为唯一权威来源（与上面的绑定逻辑保持一致）。 */
+      markItems.forEach((markEl) => {
         let isStar = false
         let isMatch = false
 
-        if (i < candidates.length) {
-          const row = candidates[i]
+        const turnNum = turnFromAriaLabel(markEl)
+        const row = turnNum > 0 ? userRowsByTurn.get(String(turnNum)) : undefined
+
+        if (row !== undefined) {
           const anchorKey = row.dataset.chatAnchorKey || ''
-          const text = (row.textContent || '').replace(/\s+/g, ' ').trim()
+          // 与 extractTurnContent 保持同一口径：优先气泡内文本（排除时间戳等旁支）。
+          const bubble = row.querySelector<HTMLElement>('[class*="_bubble"]')
+          const text = ((bubble ?? row).textContent || '').replace(/\s+/g, ' ').trim()
           const textKey = text.slice(0, 40)
 
           if ((anchorKey && starred.has(anchorKey)) || (textKey && starred.has(textKey))) {
@@ -652,22 +703,16 @@ export function apply(ctx: ClientContext): void {
           }
         }
 
-        const innerMark = markEl.querySelector<HTMLElement>('[class*="mark"], [class*="_mark"]') || markEl
-
         if (isStar) {
           markEl.classList.add('dsh-mark-starred')
-          innerMark.classList.add('dsh-mark-starred')
         } else {
           markEl.classList.remove('dsh-mark-starred')
-          innerMark.classList.remove('dsh-mark-starred')
         }
 
         if (isMatch) {
           markEl.classList.add('dsh-mark-matched')
-          innerMark.classList.add('dsh-mark-matched')
         } else {
           markEl.classList.remove('dsh-mark-matched')
-          innerMark.classList.remove('dsh-mark-matched')
         }
       })
     }
@@ -693,22 +738,33 @@ export function apply(ctx: ClientContext): void {
       if (allRows.length === 0) return { key: '', promptText: '', responseText: '' }
 
       const key = userRow.dataset.chatAnchorKey || String(allRows.indexOf(userRow))
-      const promptText = (userRow.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
+      /* 提问文本：优先取**官方气泡内部**（`*_bubble`）的文本。
+       *
+       * ⚠️ 用户行（`*_userRow`）是 flex 纵向容器，除气泡外还含时间戳、工具栏等
+       * 旁支元素；直接取整行 textContent 会把「17:07」这类内容混进卡片。 */
+      const bubbleEl = userRow.querySelector<HTMLElement>('[class*="_bubble"]')
+      const promptText = ((bubbleEl ?? userRow).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
 
-      // 回复：从该用户行往下找第一段"像正文"的内容，遇到下一个用户行即停。
+      // 回复：从该用户行往下找**该轮的回答正文**，遇到下一个用户行即停。
+      //
+      // ⚠️ 关键：必须用官方的 `data-chat-flow-kind` 精确判定，**不能只看文本长度**。
+      // 官方把助手输出按内容块分类渲染（见 ChatView 的 toAssistantBlock）：
+      //   · kind="text"      → 回答正文   ← 这才是我们要的
+      //   · kind="reasoning" → 思考过程   ← 曾被误抓（卡片显示英文思考而非回答）
+      //   · kind="tool-call" / "tool-result" / "turn-process" 等 → 过程内容，跳过
       let responseText = ''
       const startIndex = allRows.indexOf(userRow)
       if (startIndex >= 0) {
         for (let j = startIndex + 1; j < allRows.length; j++) {
           const nextRow = allRows[j]
-          if (nextRow.dataset.chatFlowKind === 'user' || nextRow.querySelector('[class*="UserStyleBubble"]')) break
-          const contentEl = nextRow.querySelector<HTMLElement>('[class*="markdown"], [class*="Markdown"], [class*="messageContent"], [class*="bubble"]') || nextRow
-          const rawText = (contentEl.textContent || '').replace(/\s+/g, ' ').trim()
-          if (rawText && rawText.length > 15 && !rawText.startsWith('pwsh -Command') && !rawText.startsWith('read ')) {
+          const kind = nextRow.dataset.chatFlowKind
+          if (kind === 'user') break
+          // 只认回答正文；思考/工具/过程一律跳过。
+          if (kind !== 'text') continue
+          const rawText = (nextRow.textContent || '').replace(/\s+/g, ' ').trim()
+          if (rawText !== '') {
             responseText = rawText.slice(0, 160)
             break
-          } else if (!responseText && rawText && rawText.length > 5) {
-            responseText = rawText.slice(0, 140)
           }
         }
       }
@@ -726,37 +782,31 @@ export function apply(ctx: ClientContext): void {
         return
       }
 
-      const markPos = target.closest<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]')
-      const mark = target.closest<HTMLElement>('[class*="mark"], [class*="_mark"]')
-      const rail = target.closest<HTMLElement>('[class*="frame"], [class*="_frame"]')
+      /* 命中判定：必须精确落在官方 Turn Rail 的刻度按钮上。
+       *
+       * 锚点是**刻度按钮自身** `button[class*="_mark"][aria-label]` —— 该形态在
+       * 官方新旧两代实现中都成立（旧版 `div.markPosition > button.mark`，
+       * 新版 `div.marks > button.mark` 且按钮自身绝对定位）。
+       *
+       * ⚠️ 官方 0.2.0-rc.1 删除了 `markPosition` 类名并改为虚拟化渲染，此前依赖
+       * `markPosition` 的选择器在新版下恒为空 → 悬停完全无反应。
+       * ⚠️ 更早还用过裸子串 `[class*="mark"]`，会误命中 `.markDirty` / `.marker` 等
+       * 小写类名 → 鼠标划过正文就疯狂弹卡片。故一律要求下划线前缀 `_mark`。 */
+      const markBtn = target.closest<HTMLElement>(SEL_MARK_BUTTON)
+      const rail = target.closest<HTMLElement>(SEL_FRAME)
 
-      if ((markPos || mark) && rail) {
-        const rect = (markPos || mark || rail).getBoundingClientRect()
+      if (markBtn !== null && rail !== null) {
+        const rect = markBtn.getBoundingClientRect()
         const centerY = rect.top + rect.height / 2
-        
+
         const rightDist = window.innerWidth - rail.getBoundingClientRect().left + 12
 
-        // 关键：不要读 dataset.dshBoundKey，因为它是「上次 updateRailMarks 跑过」才
-        // 写入的，如果跳转后的新轨道尚未被定时器维护，hover 会读到旧值/空值，
-        // 内容因此错位或漂移。改成**当场解析**鼠标悬停的那个 mark 自带的
-        // aria-label（"Jump to turn N"），再用官方行上的 data-chat-turn 查找。
-        const activeEl = markPos ?? mark!.closest<HTMLElement>('[class*="markPosition"]') ?? mark!
-        const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
-
-        /* 轮次号的**唯一可靠**来源：该刻度在 marks 容器中的顺序（1 基）。
-         *
-         * 踩过的两个坑：
-         *   · aria-label 是**本地化文案**（中文界面下是「跳转到第 381 轮」），
-         *     用英文正则 /turn\s+(\d+)/ 解析会随界面语言时好时坏；
-         *   · DOM 行的 data-chat-turn 只在「该轮已加载」时才存在，不能作为刻度→轮次的主依据。
-         * 实测：刻度总数与会话日志的最大 turn 号一致（381 ↔ 381），故顺序号即绝对轮次号。 */
-        const marksParent = activeEl.parentElement
-        const allMarks = marksParent !== null
-          ? Array.from(marksParent.querySelectorAll<HTMLElement>('[class*="markPosition"], [class*="_markPosition"]'))
-          : []
-        const markIndex = allMarks.indexOf(activeEl)
-        const turnNum = markIndex >= 0 ? markIndex + 1 : 0
+        /* 轮次号的唯一权威来源：官方刻度 aria-label 里的 {turn} 数字。
+         * 官方 items 的 turn 号**不保证从 1 连续**（历史分页/压缩会产生空洞），
+         * 因此绝不能用「刻度序号」当轮次号 —— 那会把最新一轮判成未加载。 */
+        const turnNum = turnFromAriaLabel(markBtn)
         const turn = turnNum > 0 ? String(turnNum) : ''
+        const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
 
         // 优先用**会话日志**还原该轮内容：与 DOM 是否已加载、与滚动位置都无关。
         const sid = currentSessionId()
@@ -769,10 +819,12 @@ export function apply(ctx: ClientContext): void {
         // 目标轮次为 turnNum；缺这一轮时 turnsFor 会后台回填并在完成后回调。
         const cached = sid !== ''
           ? turnsFor(sid, turnNum, (map) => {
-              // 数据到位后，若鼠标仍停在同一个刻度上，立刻换成正确内容。
-              const hovered = [...document.querySelectorAll<HTMLElement>('[class*="markPosition"]')]
-                .findIndex((el) => el.matches(':hover'))
-              if (hovered >= 0 && hovered + 1 === turnNum) showFromData(map)
+              // 数据到位后，若鼠标仍停在**同一个轮次**的刻度上，立刻换成正确内容。
+              // 注意：必须比对轮次号，不能比对刻度下标 —— turn 号不保证从 1 连续。
+              const hoveredTurn = turnFromAriaLabel(
+                document.querySelector<HTMLElement>(`${SEL_MARK_BUTTON}:hover`),
+              )
+              if (hoveredTurn === turnNum) showFromData(map)
             })
           : undefined
         if (cached !== undefined && showFromData(cached)) return
@@ -780,7 +832,7 @@ export function apply(ctx: ClientContext): void {
         // 数据里确实没有这一轮（例如尚未写入日志）时，才退回 DOM 抓取；
         // 但**绝不**把附近已加载行当成这一轮的内容（那正是"内容重复"的根因）。
         const userRow = turn !== ''
-          ? allRows.find((r) => r.dataset.chatTurn === turn && (r.dataset.chatFlowKind === 'user' || r.querySelector('[class*="UserStyleBubble"]')))
+          ? allRows.find((r) => r.dataset.chatTurn === turn && r.dataset.chatFlowKind === 'user')
           : undefined
         if (userRow !== undefined) {
           const { key, promptText, responseText } = extractTurnContent(userRow)
@@ -788,8 +840,50 @@ export function apply(ctx: ClientContext): void {
           return
         }
 
-        // 该轮在日志与 DOM 里都没有：提示尚未加载（不猜内容），
-        // 同时后台补一页历史，稍后重新悬停即可看到。
+        /* 兜底：官方 TurnNavigator 在悬停时**自己就渲染好了**该轮的预览内容
+         * （`*_preview` 里的 `previewPrompt` / `previewResponse`，见官方源码
+         * `preview.prompt` / `preview.response`）。我们只是用 CSS 把它藏起来，
+         * DOM 里的文本仍在，可直接复用。
+         *
+         * 这条兜底的价值：当我们的会话日志回填尚未完成、或 DOM 行查找未命中时，
+         * 仍能显示**正确内容**，而不是退化成误报「尚未加载」。 */
+        const officialPrompt = document.querySelector<HTMLElement>('[class*="previewPrompt"]')
+        if (officialPrompt !== null) {
+          const promptText = (officialPrompt.textContent ?? '').trim()
+          const responseText = (officialPrompt.parentElement
+            ?.querySelector<HTMLElement>('[class*="previewResponse"]')
+            ?.textContent ?? '').trim()
+          if (promptText !== '') {
+            showCard(
+              turnNum - 1 >= 0 ? turnNum - 1 : 0,
+              `official:${turnNum}`,
+              promptText,
+              responseText,
+              centerY,
+              rightDist,
+            )
+            return
+          }
+        }
+
+        /* 日志与 DOM 都没有这一轮时，才提示「尚未加载」。
+         *
+         * 官方自己就用 `*_markUnloaded` 类名标注该轮未加载（TurnNavigator 中
+         * `anchor.kind === 'unloaded'` 时把该类名 push 进 button 的 className），
+         * 因此这里以官方标记为准。
+         *
+         * ⚠️ 关键：该类名加在**内层 button 自身**上，所以必须用 `matches()` /
+         * `classList.contains()` 直接判定该元素；用 `closest()` 是往**祖先**找，
+         * 永远找不到自己（曾因此让条件恒真、把所有预览卡都抑制掉）。
+         *
+         * 另外：若连轮次号都没解析出来（turnNum === 0），说明是**我们自己**没读懂
+         * 官方 DOM，而不是这一轮没加载 —— 此时同样保持安静，绝不谎报「尚未加载」。 */
+        const officialSaysUnloaded = markBtn.matches(SEL_MARK_UNLOADED)
+        if (!officialSaysUnloaded || turnNum === 0) {
+          // 官方认为该轮已加载（或我们无法判定），只是数据还没跟上 → 等回填回调。
+          scheduleHide()
+          return
+        }
         window.clearTimeout(hideTimer)
         const notLoadedKey = `not-loaded:${turn}`
         if (currentCard === null || currentCard.dataset.key !== notLoadedKey) {
@@ -1017,7 +1111,9 @@ export function apply(ctx: ClientContext): void {
           const lines: string[] = []
           rows.forEach((row, i) => {
             const kind = row.dataset.chatFlowKind === 'user' ? '👤 User' : '🤖 Assistant'
-            const text = (row.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
+            // 与卡片/收藏同一口径：用户行优先取气泡内文本（排除时间戳等旁支元素）。
+            const bubble = row.querySelector<HTMLElement>('[class*="_bubble"]')
+            const text = ((bubble ?? row).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
             if (text) lines.push(`${i + 1}. **${kind}**: ${text}`)
           })
           const md = `# 对话结构大纲\n\n共 ${lines.length} 轮消息：\n\n${lines.join('\n')}\n`

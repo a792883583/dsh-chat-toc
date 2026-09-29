@@ -42,8 +42,15 @@ Un plugin de navegación y mejora de índice para la GUI web de DSH: **potencia 
 
 ## Requisitos
 
-- **DSH Web** con el Turn Rail oficial (incluido en `@deepseek-ai/dsh-web-app`); verificado en **`@deepseek-ai/dsh@0.1.5-rc.2`**.
-- **Cómo se integra**: localiza el riel oficial por la **estructura** del DOM — por ejemplo el nodo `previewPrompt` dentro de la tarjeta de vista previa oficial — en lugar de hashes de CSS Modules, por lo que tolera mucho mejor las actualizaciones menores.
+- **Versión mínima: host DSH ≥ `0.1.5-rc.2`** (`@deepseek-ai/dsh-client-runtime` / `dsh-client-locale` / `dsh-client-ui-chat` ≥ `0.1.5-rc.2`). `peerDependencies` declara `>=0.1.5-rc.2 <0.3.0`.
+  Este plugin depende de los siguientes contratos DOM oficiales, que solo existen desde `0.1.5-rc.2`:
+  - `data-chat-flow-kind` / `data-chat-turn` / `data-chat-anchor-key` (marcadores autoritativos de turno y fila)
+  - la distinción `data-chat-flow-kind="text"` frente a `"reasoning"` (para tomar el **cuerpo de la respuesta** y omitir el razonamiento)
+  - el número de turno dentro del `aria-label` de cada marca (`chat.turnNavigation.jump`)
+  - `*_bubble` / `*_previewPrompt` / `*_previewResponse` (texto del prompt y respaldo de vista previa oficial)
+- **Verificado en**: `0.1.5-rc.2`, `0.1.6-alpha.1/2` y **`0.2.0-rc.1`** (última actual).
+- **Compatible con el rediseño rompedor de `0.2.0-rc.1`**: esa versión **eliminó la clase `markPosition`** y pasó el riel a **renderizado virtualizado**. Este plugin ahora se ancla en el **propio botón de marca**, válido en ambas generaciones, y vuelve a leer el DOM cada vez en lugar de cachear referencias a elementos.
+- **Cómo se integra**: se basa en **atributos de datos** oficiales (`data-chat-*`) y en `aria-label` en lugar de hashes frágiles de CSS Modules, usando subcadenas de clase «prefijo hash + guion bajo» solo cuando es realmente necesario.
 - **Dependencias**: una mejora puramente del lado del cliente. Sin otros plugins, sin servicio en el host y sin configuración adicional.
 
 ## Instalación

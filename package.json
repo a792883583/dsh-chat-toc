@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-toc",
-  "version": "0.4.11",
+  "version": "0.5.0",
   "description": "DSH web GUI chat table-of-contents: native Turn Rail enhancer with rich previews, bookmarks, search, and Markdown outline export.",
   "license": "MIT",
   "author": "Jaden Tang <jaden.tang@sjfood.com>",
@@ -43,8 +43,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-locale": ">=0.1.0-rc.6 <0.3.0",
-    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.6 <0.3.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.5-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.5-rc.2 <0.3.0",
     "react": ">=16.8.0 <20.0.0"
   },
   "devDependencies": {

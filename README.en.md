@@ -42,8 +42,15 @@ A native conversation navigation and table-of-contents enhancer for the DSH Web 
 
 ## Requirements
 
-- **DSH Web** with the official Turn Rail navigation (shipped inside `@deepseek-ai/dsh-web-app`); verified on **`@deepseek-ai/dsh@0.1.5-rc.2`**.
-- **How it hooks in**: it locates the official rail by DOM **structure** — e.g. the `previewPrompt` node inside the official preview card — instead of fragile CSS-Module hashes, so it tolerates official minor upgrades far better.
+- **Minimum version: DSH host ≥ `0.1.5-rc.2`** (`@deepseek-ai/dsh-client-runtime` / `dsh-client-locale` / `dsh-client-ui-chat` ≥ `0.1.5-rc.2`). `peerDependencies` declares `>=0.1.5-rc.2 <0.3.0`.
+  This plugin relies on the following official DOM contracts, all of which exist only from `0.1.5-rc.2` onward:
+  - `data-chat-flow-kind` / `data-chat-turn` / `data-chat-anchor-key` (authoritative turn and row markers)
+  - the `data-chat-flow-kind="text"` vs `"reasoning"` distinction (to take the **answer body** and skip reasoning)
+  - the turn number inside each mark's `aria-label` (`chat.turnNavigation.jump`)
+  - `*_bubble` / `*_previewPrompt` / `*_previewResponse` (prompt text and the official-preview fallback)
+- **Verified on**: `0.1.5-rc.2`, `0.1.6-alpha.1/2`, and **`0.2.0-rc.1`** (current latest).
+- **Compatible with the breaking `0.2.0-rc.1` redesign**: that release **removed the `markPosition` class** and switched the rail to **virtualized rendering**. This plugin now anchors on the **mark button itself**, which works across both generations, and re-reads the DOM every time instead of caching mark element references.
+- **How it hooks in**: it keys off official **data attributes** (`data-chat-*`) and `aria-label` rather than fragile CSS-Module hashes, using "hash prefix + underscore" class substrings only where genuinely necessary.
 - **Dependencies**: a pure client-side enhancement. No other plugins, no host-side service, no extra configuration.
 
 ## Installation
