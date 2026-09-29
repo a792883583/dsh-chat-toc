@@ -74,7 +74,7 @@ All notable changes to `dsh-chat-toc` will be documented in this file.
   - 新增依赖注入：`remote`、`remote.session`、`sessions`（读取会话 id 与历史）。
 - 验证：真实 CDP 鼠标事件逐一悬停 5 个刻度，每个都显示各自独有的提问 + 回复，互不重复。
 
-## [0.4.10] - 2026-09-12## [0.4.10] - 2026-09-12
+## [0.4.10] - 2026-09-12
 
 ### Docs
 - **截图改用真实浏览器渲染**（Chrome headless，纯文档版本）：
