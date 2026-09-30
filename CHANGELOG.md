@@ -2,6 +2,30 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.5.1] - 2026-09-29
+
+### Fixed
+
+- **部分预览卡片只有提问、没有 AI 回复**。该问题有**三层原因**，本版逐层修复：
+  1. **数据源短路（主因）**：`showFromData` 只要 `prompt` 非空就返回 `true` 并 `return`，
+     而**提问先落库、回答要等该轮结束才写入日志**，于是「日志有提问、DOM 已有回答」时
+     回答永远取不到。现改为**三源合并**，每个字段独立取第一个非空值：
+     提问 = 会话日志 → DOM 气泡 → 官方预览卡；回答 = 会话日志 → DOM 正文 → 官方预览卡
+  2. **同 key 卡片不更新内容**：`showCard` 在 key 相同时只挪位置就 `return`，导致卡片
+     以「仅有提问」创建后回答永远补不上。现在同 key 会同步刷新内容（缺回答则补上，
+     回答消失则移除该行）
+  3. **历史缓存永不刷新**：`historyCache` 首次填充后无 TTL，若首次回填发生在回答写入日志
+     之前，该轮就永久只有提问（除非刷新页面）。新增 `refreshSnapshot()`：当目标轮次的
+     `response` 为空时限频（3 秒）重拉快照，按 `seq` 去重合并后重建轮次表并回调
+
+- **修正上一版引入的错误判据（会导致回答完全取不到）**：0.5.0 曾用
+  `data-chat-flow-kind === 'text'` 筛选回答正文，但该属性的取值是**节点种类**
+  （`assistant-step` / `tool-call` / `turn-process` / `user` …），**根本没有 `text`** ——
+  `text` / `reasoning` 是 `assistant-step` **内部的内容块**类型。现改用**渲染类名**判定，
+  与官方 `ChatView` 的 block 渲染分支一致：
+  - `block.kind === "text"` → 渲染为 `MarkdownText`（类名含 `markdown`）← 回答正文
+  - `block.kind === "reasoning"` → 渲染为 `ReasoningRow`（类名含 `thinkBody`）← 思考，跳过
+
 ## [0.5.0] - 2026-09-29
 
 ### ⚠️ 最低版本要求

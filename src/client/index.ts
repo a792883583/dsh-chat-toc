@@ -508,15 +508,66 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
+    /** 一次快照刷新之后，至少间隔这么久才允许再刷（防止悬停时反复拉取）。 */
+    const SNAPSHOT_REFRESH_MS = 3000
+
+    /**
+     * 刷新会话快照（用于补齐「日志里回答还没写入」的轮次）。
+     *
+     * 背景：`backfill` 首帧快照只在第一次拉取，而**回答是在该轮结束后才写进日志的**。
+     * 若首次回填发生在回答落库之前，`map` 里这一轮就永久只有提问（除非刷新页面）——
+     * 表现为「有些卡片有 AI 回复、有些没有」。这里按目标轮次缺失情况做一次限频重拉，
+     * 拉完重建 map 并回调。
+     */
+    const refreshSnapshot = async (sessionId: string): Promise<void> => {
+      const remote = (ctx as { remote?: { session?: RemoteSession } }).remote?.session
+      if (remote?.follow === undefined) return
+      const st = historyCache.get(sessionId)
+      if (st === undefined || st.loading) return
+      if (Date.now() - st.at < SNAPSHOT_REFRESH_MS) return
+      st.loading = true
+      try {
+        const iter = remote.follow({ address: { kind: 'session', sessionId }, maxMessages: PAGE_RECORDS })
+        for await (const frame of iter) {
+          const f = frame as { type?: string; records?: unknown[]; cursor?: number; hasMore?: boolean }
+          if (f?.type !== 'snapshot') continue
+          // 快照是「最近一段」记录；与已有记录按 seq 去重合并，保留更早翻页拿到的历史。
+          const seen = new Set(st.records.map((r) => (r as { event?: { seq?: number } })?.event?.seq))
+          for (const rec of f.records ?? []) {
+            const seq = (rec as { event?: { seq?: number } })?.event?.seq
+            if (seq === undefined || !seen.has(seq)) st.records.push(rec)
+          }
+          st.cursor = f.cursor ?? st.cursor
+          st.hasMore = f.hasMore === true
+          break
+        }
+        const closer = (iter as unknown as { return?: () => Promise<void> }).return
+        if (typeof closer === 'function') { try { await closer.call(iter) } catch {} }
+        st.records.sort((a, b) => ((a as { event?: { seq?: number } })?.event?.seq ?? 0) - ((b as { event?: { seq?: number } })?.event?.seq ?? 0))
+        st.map = parseTurns(st.records)
+        st.at = Date.now()
+      } finally {
+        st.loading = false
+      }
+    }
+
     /**
      * 同步取某会话的轮次内容；缺失目标轮次时后台回填，完成后再回调。
      * @returns 已有的 map（可能不含目标轮次）
      */
     const turnsFor = (sessionId: string, targetTurn: number, onReady?: (map: Map<number, TurnContent>) => void): Map<number, TurnContent> => {
       const st = historyCache.get(sessionId)
-      const needMore = st === undefined || (targetTurn > 0 && !st.map.has(targetTurn))
+      // 「有这一轮」还不够：该轮可能**只有提问、回答尚未写入日志**（该轮刚结束不久）。
+      // 这种情况也要补一次快照，否则卡片会永久缺回答。
+      const entry = st?.map.get(targetTurn)
+      const responseMissing = entry !== undefined && entry.response === ''
+      const needMore = st === undefined || (targetTurn > 0 && entry === undefined)
       if (needMore) {
         void backfill(sessionId, targetTurn)
+          .then(() => { const cur = historyCache.get(sessionId); if (cur !== undefined) onReady?.(cur.map) })
+          .catch(() => {})
+      } else if (responseMissing) {
+        void refreshSnapshot(sessionId)
           .then(() => { const cur = historyCache.get(sessionId); if (cur !== undefined) onReady?.(cur.map) })
           .catch(() => {})
       }
@@ -530,6 +581,27 @@ export function apply(ctx: ClientContext): void {
       if (currentCard && currentCard.dataset.key === stableKey) {
         currentCard.style.top = `${targetY}px`
         currentCard.style.right = `${rightDist}px`
+        /* ⚠️ 同一 key 也必须**同步内容**，不能只挪位置。
+         *
+         * 卡片常先以「仅有提问」创建（日志回填未完成、或该轮回答尚在流式输出），
+         * 随后数据到位才补齐回答。若此处直接 return，回答就永远补不上，
+         * 表现为「有些卡片有回答、有些没有」。 */
+        const wantPrompt = promptText || `第 ${turnIndex + 1} 轮对话`
+        const promptEl = currentCard.querySelector<HTMLElement>('.dsh-enhanced-preview-prompt')
+        if (promptEl !== null && promptEl.textContent !== wantPrompt) promptEl.textContent = wantPrompt
+        const respEl = currentCard.querySelector<HTMLElement>('.dsh-enhanced-preview-response')
+        if (responseText !== '') {
+          if (respEl !== null) {
+            if (respEl.textContent !== responseText) respEl.textContent = responseText
+          } else {
+            const el = document.createElement('div')
+            el.className = 'dsh-enhanced-preview-response'
+            el.textContent = responseText
+            promptEl?.after(el)
+          }
+        } else if (respEl !== null) {
+          respEl.remove()
+        }
         return
       }
 
@@ -745,23 +817,31 @@ export function apply(ctx: ClientContext): void {
       const bubbleEl = userRow.querySelector<HTMLElement>('[class*="_bubble"]')
       const promptText = ((bubbleEl ?? userRow).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100)
 
-      // 回复：从该用户行往下找**该轮的回答正文**，遇到下一个用户行即停。
-      //
-      // ⚠️ 关键：必须用官方的 `data-chat-flow-kind` 精确判定，**不能只看文本长度**。
-      // 官方把助手输出按内容块分类渲染（见 ChatView 的 toAssistantBlock）：
-      //   · kind="text"      → 回答正文   ← 这才是我们要的
-      //   · kind="reasoning" → 思考过程   ← 曾被误抓（卡片显示英文思考而非回答）
-      //   · kind="tool-call" / "tool-result" / "turn-process" 等 → 过程内容，跳过
+      /* 回复：从该用户行往下找**该轮的回答正文**，遇到下一个用户行即停。
+       *
+       * ⚠️ 判据必须用**渲染类名**，不能用 `data-chat-flow-kind`。
+       *
+       * 官方 `data-chat-flow-kind` 的取值是**节点种类**（`assistant-step` / `tool-call` /
+       * `turn-process` / `user` …），其中**根本没有 `text` 或 `reasoning`** ——
+       * 那两个是 `assistant-step` **内部的内容块**类型。曾误以为 flow-kind 会是
+       * "text"，结果一条回答都匹配不到（卡片只剩提问）。
+       *
+       * 官方的渲染对应关系（见 ChatView 的 block 渲染分支）：
+       *   · block.kind === "text"      → 渲染为 MarkdownText（类名含 `markdown`）← 回答正文
+       *   · block.kind === "reasoning" → 渲染为 ReasoningRow（类名 `*_thinkBody` 等）← 思考，跳过
+       * 因此这里以「含 markdown 类名、且不含思考行特征」为准。 */
       let responseText = ''
       const startIndex = allRows.indexOf(userRow)
       if (startIndex >= 0) {
         for (let j = startIndex + 1; j < allRows.length; j++) {
           const nextRow = allRows[j]
-          const kind = nextRow.dataset.chatFlowKind
-          if (kind === 'user') break
-          // 只认回答正文；思考/工具/过程一律跳过。
-          if (kind !== 'text') continue
-          const rawText = (nextRow.textContent || '').replace(/\s+/g, ' ').trim()
+          if (nextRow.dataset.chatFlowKind === 'user') break
+          // 回答正文：官方用 MarkdownText 渲染，其根节点带 markdown 类名。
+          const mdEl = nextRow.querySelector<HTMLElement>('[class*="markdown"]')
+          if (mdEl === null) continue
+          // 排除思考过程（ReasoningRow 内部也可能嵌 markdown）。
+          if (mdEl.closest('[class*="thinkBody"], [class*="ReasoningRow"], [class*="reasoning"]') !== null) continue
+          const rawText = (mdEl.textContent || '').replace(/\s+/g, ' ').trim()
           if (rawText !== '') {
             responseText = rawText.slice(0, 160)
             break
@@ -807,64 +887,66 @@ export function apply(ctx: ClientContext): void {
         const turnNum = turnFromAriaLabel(markBtn)
         const turn = turnNum > 0 ? String(turnNum) : ''
         const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
-
-        // 优先用**会话日志**还原该轮内容：与 DOM 是否已加载、与滚动位置都无关。
+        // 当前会话 id：用于查会话日志（与 DOM 是否加载、滚动位置都无关）。
         const sid = currentSessionId()
-        const showFromData = (map: Map<number, TurnContent>): boolean => {
-          const data = map.get(turnNum)
-          if (data === undefined || (data.prompt === '' && data.response === '')) return false
-          showCard(turnNum - 1, `turn:${turnNum}`, data.prompt || `第 ${turnNum} 轮对话`, data.response, centerY, rightDist)
+
+        /* 三个数据源**合并**后再渲染，绝不用其中一个短路掉另一个。
+         *
+         * 为什么必须合并：提问与回答的到达时间**并不同步** ——
+         *   · 会话日志里 prompt 往往先落库，response 要等该轮结束才写入；
+         *   · DOM 里可能只渲染了其中一部分；
+         *   · 官方预览卡（TurnNavigator 自己算的）在流式过程中也可能已有回答草稿。
+         * 此前 `showFromData` 只要 prompt 非空就返回 true 并 return，
+         * 于是「日志有提问、DOM 有回答」时**回答永远取不到**，
+         * 表现为「有些卡片有 AI 回复、有些没有」。
+         *
+         * 现在三个源各字段独立取「第一个非空值」，优先级：
+         *   会话日志（与滚动无关，最稳）→ DOM 消息行 → 官方预览卡。 */
+        const readOfficial = (): { prompt: string; response: string } => {
+          const promptEl = document.querySelector<HTMLElement>('[class*="previewPrompt"]')
+          if (promptEl === null) return { prompt: '', response: '' }
+          return {
+            prompt: (promptEl.textContent ?? '').trim(),
+            response: (promptEl.parentElement?.querySelector<HTMLElement>('[class*="previewResponse"]')?.textContent ?? '').trim(),
+          }
+        }
+
+        const computeAndShow = (loggedMap: Map<number, TurnContent> | undefined): boolean => {
+          const logged = loggedMap?.get(turnNum)
+          const userRow = turn !== ''
+            ? allRows.find((r) => r.dataset.chatTurn === turn && r.dataset.chatFlowKind === 'user')
+            : undefined
+          const dom = userRow !== undefined ? extractTurnContent(userRow) : undefined
+          const official = readOfficial()
+
+          // 各字段独立取第一个非空值：日志 → DOM → 官方预览卡。
+          const promptText = logged?.prompt || dom?.promptText || official.prompt || ''
+          const responseText = logged?.response || dom?.responseText || official.response || ''
+          if (promptText === '' && responseText === '') return false
+
+          showCard(
+            turnNum - 1 >= 0 ? turnNum - 1 : 0,
+            dom?.key || `turn:${turnNum}`,
+            promptText,
+            responseText,
+            centerY,
+            rightDist,
+          )
           return true
         }
+
         // 目标轮次为 turnNum；缺这一轮时 turnsFor 会后台回填并在完成后回调。
-        const cached = sid !== ''
+        const cachedMap = sid !== ''
           ? turnsFor(sid, turnNum, (map) => {
-              // 数据到位后，若鼠标仍停在**同一个轮次**的刻度上，立刻换成正确内容。
+              // 数据到位后，若鼠标仍停在**同一个轮次**的刻度上，立刻用合并结果刷新。
               // 注意：必须比对轮次号，不能比对刻度下标 —— turn 号不保证从 1 连续。
               const hoveredTurn = turnFromAriaLabel(
                 document.querySelector<HTMLElement>(`${SEL_MARK_BUTTON}:hover`),
               )
-              if (hoveredTurn === turnNum) showFromData(map)
+              if (hoveredTurn === turnNum) computeAndShow(map)
             })
           : undefined
-        if (cached !== undefined && showFromData(cached)) return
-
-        // 数据里确实没有这一轮（例如尚未写入日志）时，才退回 DOM 抓取；
-        // 但**绝不**把附近已加载行当成这一轮的内容（那正是"内容重复"的根因）。
-        const userRow = turn !== ''
-          ? allRows.find((r) => r.dataset.chatTurn === turn && r.dataset.chatFlowKind === 'user')
-          : undefined
-        if (userRow !== undefined) {
-          const { key, promptText, responseText } = extractTurnContent(userRow)
-          showCard(turnNum - 1 >= 0 ? turnNum - 1 : 0, key, promptText, responseText, centerY, rightDist)
-          return
-        }
-
-        /* 兜底：官方 TurnNavigator 在悬停时**自己就渲染好了**该轮的预览内容
-         * （`*_preview` 里的 `previewPrompt` / `previewResponse`，见官方源码
-         * `preview.prompt` / `preview.response`）。我们只是用 CSS 把它藏起来，
-         * DOM 里的文本仍在，可直接复用。
-         *
-         * 这条兜底的价值：当我们的会话日志回填尚未完成、或 DOM 行查找未命中时，
-         * 仍能显示**正确内容**，而不是退化成误报「尚未加载」。 */
-        const officialPrompt = document.querySelector<HTMLElement>('[class*="previewPrompt"]')
-        if (officialPrompt !== null) {
-          const promptText = (officialPrompt.textContent ?? '').trim()
-          const responseText = (officialPrompt.parentElement
-            ?.querySelector<HTMLElement>('[class*="previewResponse"]')
-            ?.textContent ?? '').trim()
-          if (promptText !== '') {
-            showCard(
-              turnNum - 1 >= 0 ? turnNum - 1 : 0,
-              `official:${turnNum}`,
-              promptText,
-              responseText,
-              centerY,
-              rightDist,
-            )
-            return
-          }
-        }
+        if (computeAndShow(cachedMap)) return
 
         /* 日志与 DOM 都没有这一轮时，才提示「尚未加载」。
          *
