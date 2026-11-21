@@ -7,7 +7,7 @@
  * @module dsh-chat-toc/client/index
  */
 
-import type {} from '@deepseek-ai/dsh-client-runtime'
+import { createElement, useEffect } from 'react'
 import { initI18n, t } from './i18n.ts'
 
 interface ClientContext {
@@ -16,9 +16,22 @@ interface ClientContext {
     getLocale(): { active: string }
     subscribe(fn: () => void): () => void
   }
+  inject?: (names: string[], fn: (scope: any) => void) => void
 }
 
-export const inject = ['locale', 'remote', 'remote.session', 'sessions']
+/**
+ * 当前会话 id：0.2 移除了 `sessions.selection`，只有会话作用域插槽的标准 props
+ * 才带 sessionId。用一个零尺寸探针组件写入，全局 DOM 逻辑再读取。
+ */
+let activeSessionId = ''
+function SessionProbe(props: { sessionId?: string }): null {
+  useEffect(() => {
+    activeSessionId = props.sessionId ?? ''
+  }, [props.sessionId])
+  return null
+}
+
+export const inject = ['locale', 'remote', 'remote.session', 'sessions', 'slots']
 
 /**
  * 官方 Turn Rail 的刻度选择器（需同时兼容新旧两代官方实现）。
@@ -281,12 +294,25 @@ export function apply(ctx: ClientContext): void {
 
   ensureStyle()
 
-
+  // 0.2 起当前会话不再由 sessions.selection 给出：用会话作用域插槽捕获标准 props。
+  try {
+    ctx.inject?.(['slots'], (scope: any) => {
+      scope.slots?.inject?.('conversation.input.dock', () =>
+        scope.slots.register({
+          name: 'conversation.input.dock',
+          id: 'chat-toc-session-probe',
+          order: 90,
+        }, SessionProbe))
+    })
+  } catch (error) {
+    console.warn('dsh-chat-toc: session probe registration failed', error)
+  }
 
   ctx.effect(() => {
     let disposed = false
 
     const getSessionId = (): string => {
+      if (activeSessionId) return activeSessionId
       const match = window.location.pathname.match(/\/session\/([^\/]+)/) ||
                     window.location.hash.match(/session\/([^\/]+)/) ||
                     window.location.href.match(/session-([a-zA-Z0-9_-]+)/)
@@ -434,12 +460,13 @@ export function apply(ctx: ClientContext): void {
       return map
     }
 
-    /** 当前会话 id（来自 sessions.selection 快照）。 */
+    /** 当前会话 id：优先取插槽探针写入的标准 props，退化为列表首项。 */
     const currentSessionId = (): string => {
+      if (activeSessionId) return activeSessionId
       try {
-        const sel = (ctx as { sessions?: { selection?: { getSnapshot?: () => unknown } } }).sessions?.selection
-        const snap = typeof sel?.getSnapshot === 'function' ? (sel.getSnapshot() as { sessionId?: string }) : undefined
-        return snap?.sessionId ?? ''
+        const list = (ctx as any).sessions?.list?.getSnapshot?.()
+        const id = list?.ids?.[0]
+        return typeof id === 'string' ? id : ''
       } catch {
         return ''
       }

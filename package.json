@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-toc",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "DSH web GUI chat table-of-contents: native Turn Rail enhancer with rich previews, bookmarks, search, and Markdown outline export.",
   "license": "MIT",
   "author": "Jaden Tang <jaden.tang@sjfood.com>",
@@ -32,7 +32,6 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-locale"
       ],
       "platform": "web"
@@ -44,14 +43,12 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-client-locale": ">=0.1.5-rc.2 <0.3.0",
-    "@deepseek-ai/dsh-client-runtime": ">=0.1.5-rc.2 <0.3.0",
     "react": ">=16.8.0 <20.0.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-client-locale": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.5",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

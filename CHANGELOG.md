@@ -2,6 +2,16 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.5.2] - 2026-11-21
+
+### Fixed
+
+- **DSH 0.2 兼容性**：0.2 移除了 `sessions.selection`，原逻辑取不到当前会话 id，
+  导致会话日志回填失效、预览卡只能依赖 DOM/官方预览。现在通过会话作用域插槽
+  `conversation.input.dock` 的零尺寸探针读取标准 props `sessionId`，并保留列表首项兜底。
+- 收藏/书签的 session key 也改用上面的当前会话 id，不再因 0.2 路由不带 session 而全部落到 `default-session`。
+- 移除 0.2 已不存在的 `@deepseek-ai/dsh-client-runtime` 注入与 peer 声明，devDependencies 升到 0.2.2-rc.5。
+
 ## [0.5.1] - 2026-09-29
 
 ### Fixed
