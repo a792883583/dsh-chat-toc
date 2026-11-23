@@ -2,6 +2,15 @@
 
 All notable changes to `dsh-chat-toc` will be documented in this file.
 
+## [0.5.3] - 2026-11-23
+
+### Added
+
+- **流式预览**：DSH 0.2 的助手增量只走 `remote.session.follow` 的 `assistant-stream` 帧，
+  不写会话日志。插件现在单独维持一条带 `assistantStream: true` 的 follow 连接，
+  按 `attemptId → turn` 聚合 `text-delta`，悬停该轮次时预览卡实时补上正在生成的回答；
+  日志落库后自动以正式回复为准，放弃的 attempt 会清掉临时文本。
+
 ## [0.5.2] - 2026-11-21
 
 ### Fixed

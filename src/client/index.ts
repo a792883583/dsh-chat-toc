@@ -31,6 +31,12 @@ function SessionProbe(props: { sessionId?: string }): null {
   return null
 }
 
+/** 0.2 的流式增量不在会话日志里，只在 follow 的 assistant-stream 帧里；按轮次暂存。 */
+const liveTextByTurn = new Map<number, string>()
+const liveAttemptTurn = new Map<string, number>()
+let hoveredTurnForLive = 0
+let refreshHoveredLive: (() => void) | null = null
+
 export const inject = ['locale', 'remote', 'remote.session', 'sessions', 'slots']
 
 /**
@@ -477,6 +483,79 @@ export function apply(ctx: ClientContext): void {
       page?: (req: unknown) => Promise<{ ok: boolean; value?: { records?: unknown[]; hasMore?: boolean } }>
     }
 
+    /* 0.2 的流式回答只走 follow 的 assistant-stream 帧，不写会话日志。
+       单独长连接接住它，悬停当前轮次时实时刷新预览卡。 */
+    let liveStream: AsyncIterable<unknown> | null = null
+    let liveSession = ''
+    let liveStopped = false
+    let liveTimer = 0
+    const closeLive = (): void => {
+      liveStopped = true
+      const closer = (liveStream as unknown as { return?: () => Promise<void> } | null)?.return
+      if (typeof closer === 'function') {
+        try {
+          void closer.call(liveStream)
+        } catch {
+          /* ignore */
+        }
+      }
+      liveStream = null
+    }
+    const startLive = async (sid: string): Promise<void> => {
+      const remote = (ctx as { remote?: { session?: RemoteSession } }).remote?.session
+      if (remote?.follow === undefined) return
+      liveStopped = false
+      const iter = remote.follow({
+        address: { kind: 'session', sessionId: sid },
+        maxMessages: 20,
+        assistantStream: true,
+      })
+      liveStream = iter
+      try {
+        for await (const frame of iter) {
+          if (liveStopped || disposed || liveSession !== sid) break
+          const f = frame as { type?: string; frame?: any }
+          if (f?.type !== 'assistant-stream' || f.frame === undefined) continue
+          const sf = f.frame as { type?: string; attemptId?: string; turn?: number; chunk?: any; outcome?: { kind?: string } }
+          if (sf.type === 'start') {
+            if (typeof sf.attemptId === 'string' && typeof sf.turn === 'number') liveAttemptTurn.set(sf.attemptId, sf.turn)
+            continue
+          }
+          if (sf.type === 'chunk') {
+            const turn = typeof sf.attemptId === 'string' ? liveAttemptTurn.get(sf.attemptId) : undefined
+            const ch = sf.chunk
+            if (turn !== undefined && ch?.type === 'text-delta' && typeof ch.text === 'string') {
+              liveTextByTurn.set(turn, (liveTextByTurn.get(turn) ?? '') + ch.text)
+              if (hoveredTurnForLive === turn) refreshHoveredLive?.()
+            }
+            continue
+          }
+          if (sf.type === 'end' && typeof sf.attemptId === 'string') {
+            const turn = liveAttemptTurn.get(sf.attemptId)
+            if (sf.outcome?.kind === 'abandoned' && turn !== undefined) liveTextByTurn.delete(turn)
+            liveAttemptTurn.delete(sf.attemptId)
+          }
+        }
+      } catch {
+        /* 会话切换/插件卸载时中断是正常路径 */
+      }
+    }
+    liveTimer = window.setInterval(() => {
+      if (disposed) return
+      const sid = currentSessionId()
+      if (sid === liveSession) return
+      closeLive()
+      liveSession = sid
+      liveTextByTurn.clear()
+      liveAttemptTurn.clear()
+      if (sid !== '') void startLive(sid)
+    }, 1000)
+    const initialSession = currentSessionId()
+    if (initialSession !== '') {
+      liveSession = initialSession
+      void startLive(initialSession)
+    }
+
     /** 建立（或续接）某会话的历史回填：首帧快照 + 按需向前翻页。 */
     const backfill = async (sessionId: string, targetTurn: number): Promise<void> => {
       const remote = (ctx as { remote?: { session?: RemoteSession } }).remote?.session
@@ -720,6 +799,8 @@ export function apply(ctx: ClientContext): void {
     const scheduleHide = () => {
       window.clearTimeout(hideTimer)
       hideTimer = window.setTimeout(() => {
+        hoveredTurnForLive = 0
+        refreshHoveredLive = null
         currentCard?.remove()
         currentCard = null
       }, 300)
@@ -912,6 +993,7 @@ export function apply(ctx: ClientContext): void {
          * 官方 items 的 turn 号**不保证从 1 连续**（历史分页/压缩会产生空洞），
          * 因此绝不能用「刻度序号」当轮次号 —— 那会把最新一轮判成未加载。 */
         const turnNum = turnFromAriaLabel(markBtn)
+        hoveredTurnForLive = turnNum
         const turn = turnNum > 0 ? String(turnNum) : ''
         const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-chat-anchor-key]'))
         // 当前会话 id：用于查会话日志（与 DOM 是否加载、滚动位置都无关）。
@@ -928,7 +1010,7 @@ export function apply(ctx: ClientContext): void {
          * 表现为「有些卡片有 AI 回复、有些没有」。
          *
          * 现在三个源各字段独立取「第一个非空值」，优先级：
-         *   会话日志（与滚动无关，最稳）→ DOM 消息行 → 官方预览卡。 */
+         *   会话日志（与滚动无关，最稳）→ DOM 消息行 → 官方预览卡 → 0.2 流式增量。 */
         const readOfficial = (): { prompt: string; response: string } => {
           const promptEl = document.querySelector<HTMLElement>('[class*="previewPrompt"]')
           if (promptEl === null) return { prompt: '', response: '' }
@@ -945,10 +1027,11 @@ export function apply(ctx: ClientContext): void {
             : undefined
           const dom = userRow !== undefined ? extractTurnContent(userRow) : undefined
           const official = readOfficial()
+          const streaming = liveTextByTurn.get(turnNum) ?? ''
 
-          // 各字段独立取第一个非空值：日志 → DOM → 官方预览卡。
+          // 各字段独立取第一个非空值：日志 → DOM → 官方预览卡 → 流式增量。
           const promptText = logged?.prompt || dom?.promptText || official.prompt || ''
-          const responseText = logged?.response || dom?.responseText || official.response || ''
+          const responseText = logged?.response || dom?.responseText || official.response || streaming
           if (promptText === '' && responseText === '') return false
 
           showCard(
@@ -960,6 +1043,9 @@ export function apply(ctx: ClientContext): void {
             rightDist,
           )
           return true
+        }
+        refreshHoveredLive = () => {
+          computeAndShow(historyCache.get(sid)?.map)
         }
 
         // 目标轮次为 turnNum；缺这一轮时 turnsFor 会后台回填并在完成后回调。
@@ -1265,6 +1351,10 @@ export function apply(ctx: ClientContext): void {
       disposed = true
       window.removeEventListener('mousemove', onMouseMove)
       window.clearInterval(timer)
+      window.clearInterval(liveTimer)
+      closeLive()
+      hoveredTurnForLive = 0
+      refreshHoveredLive = null
       window.clearTimeout(hideTimer)
       currentCard?.remove()
       document.querySelector('.dsh-top-capsule')?.remove()
